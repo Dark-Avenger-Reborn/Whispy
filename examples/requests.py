@@ -14,6 +14,8 @@ def import_remote_packages(package):
 
     for name, code in mods.items():
         mod = types.ModuleType(name)
+        mod.__name__ = name
+        mod.__package__ = name.rsplit('.', 1)[0]
         exec(code, mod.__dict__)
         sys.modules[name] = mod
 
@@ -22,7 +24,5 @@ def import_remote_packages(package):
 
 
 requests = import_remote_packages("requests")
-numpy = import_remote_packages("numpy")
 
 print(requests.get("https://httpbin.org/get").status_code)
-numpy.test()
