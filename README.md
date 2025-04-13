@@ -13,9 +13,7 @@ Think of it like a CDN for Python packages — fast, clean, and ephemeral.
 - 🧠 **Fully in-memory loading** — nothing is written to disk
 - 🔐 **SHA256 verification** ensures PyPI package integrity
 - 💾 **Automatic server-side caching** (optional force-refresh)
-- 🌀 **Multiple package imports** in one call
 - 🧩 **Zero external dependencies** on the client
-- 🔁 **Pluggable and self-contained** — no database needed
 - 💡 **Ultra-simple client API**:
     ```python
     requests = import_remote_packages("requests")
