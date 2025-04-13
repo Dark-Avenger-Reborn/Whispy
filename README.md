@@ -70,13 +70,12 @@ def import_remote_packages(package):
         mods = json.loads(resp.read().decode("utf-8")).get(package, {})
 
     for name, code in mods.items():
-for name, code in mods.items():
         mod = types.ModuleType(name)
         mod.__name__ = name
         mod.__package__ = name.rsplit('.', 1)[0]
         exec(code, mod.__dict__)
         sys.modules[name] = mod
-
+    
     _loaded_modules[package] = sys.modules.get(package)
     return _loaded_modules[package]
 ```
