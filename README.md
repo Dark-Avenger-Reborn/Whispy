@@ -127,9 +127,9 @@ You can delete this folder at any time to clear the cache.
 - Packages are **SHA256-verified** using PyPI’s metadata to prevent tampering
 - The client **never touches disk** — packages live only in memory
 - If you're exposing the server externally, consider adding:
-  - IP or package whitelisting
+  - IP whitelisting
   - Logging and usage tracking
-  - Network restrictions or auth
+  - Network restrictions
 
 ---
 
