@@ -56,36 +56,32 @@ This starts the Whispy server at `http://localhost:5000`.
 Just copy the client code below into your Python script:
 
 ```python
-import sys
-import importlib
-import urllib.request
-import io
-import zipfile
-import tempfile
-import os
+import sys, importlib, urllib.request, io, zipfile, tempfile, platform
+from collections import namedtuple
 
-def import_remote_packages(package_name, version=None, server_url="http://localhost:5000"):
-    query = f"?name={package_name}"
-    if version:
-        query += f"&version={version}"
-    url = f"{server_url}/get_package{query}"
+Tag = namedtuple('Tag', 'interpreter abi platform')
+
+def sys_tags():
+    impl, mach, sysname = platform.python_implementation(), platform.machine().lower(), platform.system()
+    vi = sys.version_info if impl == 'CPython' else getattr(sys, 'pypy_version_info', sys.version_info)
+    interp = f"{'cp' if impl == 'CPython' else 'pp'}{vi.major}{vi.minor}"
+    abi = f"{'cp' if impl == 'CPython' else 'pypy'}{vi.major}{vi.minor}" + ('' if impl == 'CPython' else '_pp73')
+    plats = {
+        'Linux': [f"manylinux_2_28_{mach}", f"manylinux_2_17_{mach}", f"manylinux2014_{mach}"] if mach in ['x86_64','aarch64','armv7l'] else [f"manylinux2014_{mach}"],
+        'Windows': ['win_amd64'] if '64' in mach else ['win32'],
+        'Darwin': ['macosx_10_9_x86_64']
+    }.get(sysname, []) + ['any']
+    return [Tag(interp, abi, p) for p in plats] + ([Tag(interp, 'abi3', p) for p in plats] if interp.startswith('cp') else []) + [Tag('py3', 'none', p) for p in plats] + ([Tag(interp, 'none', p) for p in plats] if interp.startswith('cp') else [])
+
+def import_remote_packages(pkg, ver=None, host="http://localhost:5000"):
+    tags = ','.join(f"{t.interpreter}-{t.abi}-{t.platform}" for t in sys_tags())
+    url = f"{host}/get_package?name={pkg}&tags={tags}" + (f"&version={ver}" if ver else "")
     print(f"📡 Requesting {url}")
-    response = urllib.request.urlopen(url)
-    if response.getcode() != 200:
-        raise Exception(f"Server error: {response.read().decode()}")
-    zip_data = io.BytesIO(response.read())
-    temp_dir = tempfile.TemporaryDirectory()
-    with zipfile.ZipFile(zip_data) as zip_ref:
-        zip_ref.extractall(temp_dir.name)
-    sys.path.insert(0, temp_dir.name)
-    if not hasattr(sys, "_in_memory_packages"):
-        sys._in_memory_packages = []
-    sys._in_memory_packages.append(temp_dir)
-    try:
-        module = importlib.import_module(package_name)
-        return module
-    except Exception as e:
-        raise RuntimeError(f"Failed to import {package_name}: {e}")
+    with urllib.request.urlopen(url) as r: data = io.BytesIO(r.read()) if r.getcode() == 200 else (_ for _ in ()).throw(Exception(r.read().decode()))
+    td = tempfile.TemporaryDirectory(); zipfile.ZipFile(data).extractall(td.name); sys.path.insert(0, td.name)
+    sys._in_memory_packages = getattr(sys, '_in_memory_packages', []) + [td]
+    try: return importlib.import_module(pkg)
+    except Exception as e: raise RuntimeError(f"Failed to import {pkg}: {e}")
 ```
 
 > 🧩 **No external dependencies required!**  
