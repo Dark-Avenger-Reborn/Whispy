@@ -10,6 +10,37 @@ from flask import Flask, request, send_file, jsonify
 from io import BytesIO
 from pathlib import Path
 import urllib.parse
+from collections import namedtuple
+
+Tag = namedtuple('Tag', ['interpreter', 'abi', 'platform'])
+
+class TagWrapper:
+    def __init__(self, tag: Tag):
+        self.tag = tag
+
+    def __repr__(self):
+        return f"{self.tag.interpreter}-{self.tag.abi}-{self.tag.platform}"
+
+    def __eq__(self, other):
+        return isinstance(other, TagWrapper) and self.tag == other.tag
+
+    def __hash__(self):
+        return hash(self.tag)
+
+
+class Version:
+    def __init__(self, version_str):
+        self._version = version_str
+
+    def __repr__(self):
+        return f"<Version('{self._version}')>"
+
+    def __eq__(self, other):
+        return isinstance(other, Version) and self._version == other._version
+
+    def __hash__(self):
+        return hash(self._version)
+
 
 CACHE_DIR = './cache'
 if not os.path.exists(CACHE_DIR):
@@ -43,7 +74,83 @@ def extract_archive(archive_path, extract_to):
     else:
         raise ValueError(f"Unsupported archive format: {archive_path}")
 
-def download_and_extract_package(package_name, version=None):
+def parse_wheel_filename(filename):
+    # Remove .whl extension
+    if not filename.endswith('.whl'):
+        raise ValueError("Not a .whl file")
+    name = filename[:-4]
+
+    # Split the filename into parts
+    parts = name.split('-')
+    if len(parts) < 5:
+        raise ValueError("Filename format is not valid")
+
+    # Extract name and version
+    distribution = parts[0]
+    version = Version(parts[1])
+    py_tag = parts[2]
+    abi_tag = parts[3]
+    platforms = '-'.join(parts[4:])  # Re-join in case platform contains dashes
+
+    # Split platforms by dots
+    platform_tags = platforms.split('.')
+    # Create TagWrapper instances
+    tag_set = frozenset(TagWrapper(Tag(py_tag, abi_tag, platform)) for platform in platform_tags)
+    return (distribution, version, (), tag_set)
+
+def parse_wheel_tags(filename, tags_input):
+    try:
+        parsed = parse_wheel_filename(filename)
+        # Check the tuple length
+        if len(parsed) == 2:
+            # Older packaging versions may return (name_version, tagset)
+            _, tagset = parsed
+        elif len(parsed) == 4:
+            # Newer packaging versions return (distribution, version, build, tagset)
+            _, _, _, tagset = parsed
+        else:
+            print(f"⚠️ Unexpected parse_wheel_filename tuple length for {filename}: {len(parsed)}")
+            return set()
+        return set(str(tag) for tag in tagset)
+    except Exception as e:
+        print(f"⚠️ Failed to parse tags for {filename}: {e}")
+        return set()
+
+def cast_to_tag(tag_like) -> Tag:
+    if isinstance(tag_like, Tag):
+        return tag_like
+    if isinstance(tag_like, str):
+        parts = tag_like.split('-')
+        if len(parts) == 3:
+            return Tag(*parts)
+        else:
+            raise ValueError(f"Invalid tag string format: '{tag_like}'")
+    raise TypeError(f"Cannot cast type {type(tag_like)} to Tag")
+
+def compatible_with_current(tags, tags_input):
+    current = set(f"{cast_to_tag(tag).interpreter}-{cast_to_tag(tag).abi}-{cast_to_tag(tag).platform}" for tag in tags_input.split(","))
+    return not tags.isdisjoint(current)
+
+def find_best_wheel(links, tags_input):
+    wheels = []
+    for link in links:
+        if link.endswith('.whl'):
+            filename = os.path.basename(link)
+            tags = parse_wheel_tags(filename, tags_input)
+            wheels.append((link, tags))
+
+    compatible = [(link, tags) for link, tags in wheels if compatible_with_current(tags, tags_input)]
+    if compatible:
+        return compatible[0][0]
+    return None
+
+def find_sdist(links):
+    for link in links:
+        if link.endswith(('.tar.gz', '.zip', '.tar.bz2', '.tar')):
+            return link
+    return None
+
+def download_and_extract_package(package_name, tags, version=None):
     index_url = f"https://pypi.org/pypi/{urllib.parse.quote(package_name)}/json"
     with urllib.request.urlopen(index_url) as response:
         data = json.load(response)
@@ -54,7 +161,7 @@ def download_and_extract_package(package_name, version=None):
         raise ValueError(f"Version {version} not found for {package_name}")
 
     links = [f["url"] for f in release]
-    best_wheel = find_best_wheel(links)
+    best_wheel = find_best_wheel(links, tags)
     temp_dir = tempfile.mkdtemp()
 
     if best_wheel:
@@ -113,6 +220,7 @@ app = Flask(__name__)
 def get_package():
     package_name = request.args.get("name")
     version = request.args.get("version")
+    tags = request.args.get("tags")
 
     if not package_name:
         return jsonify({"error": "Missing 'name' parameter"}), 400
@@ -127,7 +235,7 @@ def get_package():
                 return send_file(f, as_attachment=True, download_name=f"{package_name}.zip")
 
         # If not cached or invalid, download and extract the package
-        extracted_dir = download_and_extract_package(package_name, version)
+        extracted_dir = download_and_extract_package(package_name, tags, version)
 
         # Zip the folder to send
         buffer = BytesIO()
@@ -136,12 +244,13 @@ def get_package():
             buffer.write(f.read())
         buffer.seek(0)
 
-        shutil.rmtree(extracted_dir)
-        os.remove("/tmp/pkg.zip")
-
-        # Update cache after downloading and extracting
+        # ✅ Update cache before deleting the file
         update_cache(package_name, version, "/tmp/pkg.zip")
 
+        # Cleanup
+        shutil.rmtree(extracted_dir)
+        os.remove("/tmp/pkg.zip")
+        
         return send_file(buffer, as_attachment=True, download_name=f"{package_name}.zip")
 
     except Exception as e:
