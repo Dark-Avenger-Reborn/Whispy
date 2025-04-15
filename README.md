@@ -13,7 +13,7 @@ Think of it like a CDN for Python packages — fast, clean, and ephemeral.
 - 🧠 **Fully in-memory loading** — nothing is written to disk
 - 🧩 **Zero external dependencies** on the client
 - 🔐 **SHA256 verification** ensures PyPI package integrity
-- 💾 **Automatic server-side caching** (optional force-refresh)
+- 💾 **Automatic server-side caching** increases package return speed
 - 💡 **Ultra-simple client API**:
 -
     ```python
@@ -95,21 +95,6 @@ def import_remote_packages(pkg, ver=None, host="http://localhost:5000"):
 requests = import_remote_packages("requests")
 
 print(requests.get("https://httpbin.org/get").status_code)
-```
-
----
-
-## 🔄 Optional: Cache Invalidation
-
-To bypass the server’s cache and force a fresh download from PyPI:
-
-```bash
-POST http://localhost:5000/get_modules?force=true
-```
-
-In client code:
-```python
-req = Request("http://localhost:5000/get_modules?force=true", data=..., headers=...)
 ```
 
 ---
