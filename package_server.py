@@ -216,6 +216,50 @@ def update_cache(package_name, version, package_file_path):
 
 app = Flask(__name__)
 
+def make_cache_key(package_name, version, tags):
+    tag_hash = hashlib.sha256(tags.encode()).hexdigest()[:8]
+    return f"{package_name}-{version}-{tag_hash}"
+
+
+def get_cached_package(package_name, version, tags):
+    cache_key = make_cache_key(package_name, version, tags)
+    cache_meta_file = os.path.join(CACHE_DIR, f"{cache_key}.json")
+
+    if os.path.exists(cache_meta_file):
+        with open(cache_meta_file, 'r') as f:
+            cached_data = json.load(f)
+
+        cached_file_path = cached_data['file_path']
+        if os.path.exists(cached_file_path):
+            cached_sha256 = cached_data['sha256']
+            current_sha256 = get_sha256_hash(cached_file_path)
+            if current_sha256 == cached_sha256:
+                print("✅ Cache hit.")
+                return cached_file_path
+            else:
+                print("❌ Cache hash mismatch.")
+
+    return None
+
+
+def update_cache(package_name, version, package_file_path, tags):
+    cache_key = make_cache_key(package_name, version, tags)
+    sha256 = get_sha256_hash(package_file_path)
+
+    dest_zip = os.path.join(CACHE_DIR, f"{cache_key}.zip")
+    shutil.copyfile(package_file_path, dest_zip)
+
+    cache_meta_file = os.path.join(CACHE_DIR, f"{cache_key}.json")
+    package_data = {
+        'file_path': dest_zip,
+        'sha256': sha256
+    }
+
+    with open(cache_meta_file, 'w') as f:
+        json.dump(package_data, f)
+
+    return dest_zip
+
 @app.route("/get_package", methods=["GET"])
 def get_package():
     package_name = request.args.get("name")
@@ -224,37 +268,40 @@ def get_package():
 
     if not package_name:
         return jsonify({"error": "Missing 'name' parameter"}), 400
+    if not tags:
+        return jsonify({"error": "Missing 'tags' parameter"}), 400
 
     try:
-        # Check if package is in cache
-        cached_package = get_cached_package(package_name, version)
-        
-        if cached_package:
-            # If cached and valid, serve it
-            with open(cached_package, 'rb') as f:
-                return send_file(f, as_attachment=True, download_name=f"{package_name}.zip")
+        cached_package = get_cached_package(package_name, version, tags)
 
-        # If not cached or invalid, download and extract the package
+        if cached_package:
+            return send_file(cached_package, as_attachment=True, download_name=f"{package_name}.zip")
+
+        # Download and extract
         extracted_dir = download_and_extract_package(package_name, tags, version)
 
-        # Zip the folder to send
-        buffer = BytesIO()
-        shutil.make_archive("/tmp/pkg", 'zip', extracted_dir)
-        with open("/tmp/pkg.zip", "rb") as f:
-            buffer.write(f.read())
-        buffer.seek(0)
+        # Write to a uniquely named temp file
+        tmp_fd, tmp_zip_path = tempfile.mkstemp(suffix='.zip')
+        os.close(tmp_fd)
+        shutil.make_archive(tmp_zip_path[:-4], 'zip', extracted_dir)
 
-        # ✅ Update cache before deleting the file
-        update_cache(package_name, version, "/tmp/pkg.zip")
+        # Update cache
+        final_cached_path = update_cache(package_name, version, tmp_zip_path, tags)
 
-        # Cleanup
+        # Serve from memory
+        with open(final_cached_path, "rb") as f:
+            zip_bytes = f.read()
+        buffer = BytesIO(zip_bytes)
+
+        # Clean up
         shutil.rmtree(extracted_dir)
-        os.remove("/tmp/pkg.zip")
-        
+        os.remove(tmp_zip_path)
+
         return send_file(buffer, as_attachment=True, download_name=f"{package_name}.zip")
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
