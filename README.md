@@ -19,7 +19,7 @@ Think of it like a CDN for Python packages — fast, clean, and ephemeral.
     ```python
     requests = import_remote_packages("requests")
     ```
-> 🧠 **Note:** Supports both **pure Python** and **native extension** packages (e.g., `.so`, `.pyd`, etc.).
+> 🧠 **Note:** Supports both **pure Python** and **native extension** packages (e.g., `.so`, `.pyd`, etc.). But dependencies like apt packages are not accounted for. Not all packages may work. This is not a perfect solution or a replacement to pip. Pull requests are always welcome.
 
 ---
 
