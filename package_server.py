@@ -53,6 +53,12 @@ def get_sha256_hash(file_path):
             sha256.update(chunk)
     return sha256.hexdigest()
 
+def verify_download(file_path, expected_sha256):
+    print(f"🔍 Verifying SHA256: {expected_hash}")
+    actual_sha256 = get_sha256_hash(file_path)
+    if actual_sha256 != expected_sha256:
+        raise ValueError(f"SHA256 mismatch: expected {expected_sha256}, got {actual_sha256}")
+
 def download_url(url, dest):
     print(f"⬇️  Downloading {url}")
     with urllib.request.urlopen(url) as response, open(dest, 'wb') as out_file:
@@ -164,23 +170,35 @@ def download_and_extract_package(package_name, tags, version=None):
     best_wheel = find_best_wheel(links, tags)
     temp_dir = tempfile.mkdtemp()
 
+    def try_verify(file_path, file_info):
+        if file_info and "digests" in file_info and "sha256" in file_info["digests"]:
+            expected_hash = file_info["digests"]["sha256"]
+            print(f"🔐 Verifying hash: {expected_hash}")
+            verify_download(file_path, expected_hash)
+        else:
+            print("⚠️  No SHA256 digest found for file. Skipping verification.")
+
     if best_wheel:
+        wheel_info = next((f for f in release if f["url"] == best_wheel), None)
         wheel_path = os.path.join(temp_dir, os.path.basename(best_wheel))
         print(f"📦 Downloading wheel: {best_wheel}")
         download_url(best_wheel, wheel_path)
+        try_verify(wheel_path, wheel_info)
         extract_archive(wheel_path, temp_dir)
         return temp_dir
 
-    # Fall back to source dist
     sdist = find_sdist(links)
     if sdist:
+        sdist_info = next((f for f in release if f["url"] == sdist), None)
         sdist_path = os.path.join(temp_dir, os.path.basename(sdist))
         print(f"📦 Downloading source: {sdist}")
         download_url(sdist, sdist_path)
+        try_verify(sdist_path, sdist_info)
         extract_archive(sdist_path, temp_dir)
         return temp_dir
 
     raise RuntimeError("No compatible distribution found.")
+
 
 def get_cached_package(package_name, version):
     cache_file = os.path.join(CACHE_DIR, f"{package_name}-{version}.json")
