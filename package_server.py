@@ -54,7 +54,7 @@ def get_sha256_hash(file_path):
     return sha256.hexdigest()
 
 def verify_download(file_path, expected_sha256):
-    print(f"🔍 Verifying SHA256: {expected_hash}")
+    print(f"🔍 Verifying SHA256: {expected_sha256}")
     actual_sha256 = get_sha256_hash(file_path)
     if actual_sha256 != expected_sha256:
         raise ValueError(f"SHA256 mismatch: expected {expected_sha256}, got {actual_sha256}")
