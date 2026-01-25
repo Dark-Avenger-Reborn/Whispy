@@ -1,6 +1,6 @@
 """
-Example: Using NumPy for numerical computing
-This demonstrates loading a package with compiled extensions dynamically
+Example: Using requests library to fetch data from an API
+This demonstrates loading a pure-Python package dynamically
 """
 import sys, importlib, urllib.request, io, zipfile, tempfile, platform
 from collections import namedtuple
@@ -32,14 +32,11 @@ def import_remote_packages(pkg, ver=None, host="http://localhost:5000", module=N
 
 if __name__ == "__main__":
     try:
-        numpy = import_remote_packages("numpy")
-        print("✅ NumPy version:", numpy.__version__)
+        requests = import_remote_packages("requests")
+        print("✅ Requests version:", requests.__version__)
         
-        # Create a simple array and perform operations
-        arr = numpy.array([1, 2, 3, 4, 5])
-        print(f"\n📊 Array: {arr}")
-        print(f"📈 Mean: {numpy.mean(arr)}")
-        print(f"📊 Standard deviation: {numpy.std(arr)}")
-        print(f"✨ Sum: {numpy.sum(arr)}")
+        # Make a simple HTTP GET request
+        response = requests.get("https://api.github.com/zen")
+        print(f"📝 GitHub API Response: {response.text}")
     except Exception as e:
         print(f"❌ Error: {e}")

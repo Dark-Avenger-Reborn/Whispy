@@ -1,6 +1,6 @@
 """
-Example: Using NumPy for numerical computing
-This demonstrates loading a package with compiled extensions dynamically
+Example: Loading multiple packages
+This demonstrates how to load and use multiple packages together
 """
 import sys, importlib, urllib.request, io, zipfile, tempfile, platform
 from collections import namedtuple
@@ -32,14 +32,28 @@ def import_remote_packages(pkg, ver=None, host="http://localhost:5000", module=N
 
 if __name__ == "__main__":
     try:
-        numpy = import_remote_packages("numpy")
-        print("✅ NumPy version:", numpy.__version__)
+        print("🔄 Loading multiple packages dynamically...\n")
         
-        # Create a simple array and perform operations
-        arr = numpy.array([1, 2, 3, 4, 5])
-        print(f"\n📊 Array: {arr}")
-        print(f"📈 Mean: {numpy.mean(arr)}")
-        print(f"📊 Standard deviation: {numpy.std(arr)}")
-        print(f"✨ Sum: {numpy.sum(arr)}")
+        # Load JSON parsing library
+        json_lib = import_remote_packages("simplejson")
+        print(f"✅ simplejson {json_lib.__version__} loaded\n")
+        
+        # Load datetime utilities (distribution: python-dateutil, module: dateutil)
+        dateutil = import_remote_packages("python-dateutil", module="dateutil")
+        print(f"✅ python-dateutil loaded\n")
+        
+        # Use them together
+        print("📝 Example: JSON data with date parsing")
+        data = json_lib.dumps({"name": "example", "date": "2024-01-25"})
+        print(f"JSON: {data}")
+        
+        parsed = json_lib.loads(data)
+        print(f"Parsed: {parsed}")
+        
+        # Create a date object (import uses 'dateutil', not 'python-dateutil')
+        from dateutil import parser
+        date_obj = parser.parse(parsed["date"])
+        print(f"Date: {date_obj.strftime('%Y-%m-%d %A')}")
+        
     except Exception as e:
         print(f"❌ Error: {e}")

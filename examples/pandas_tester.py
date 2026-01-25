@@ -1,5 +1,5 @@
 """
-Example: Using NumPy for numerical computing
+Example: Using pandas for data manipulation
 This demonstrates loading a package with compiled extensions dynamically
 """
 import sys, importlib, urllib.request, io, zipfile, tempfile, platform
@@ -32,14 +32,26 @@ def import_remote_packages(pkg, ver=None, host="http://localhost:5000", module=N
 
 if __name__ == "__main__":
     try:
+        # Import pandas and numpy dynamically
         numpy = import_remote_packages("numpy")
-        print("✅ NumPy version:", numpy.__version__)
+        pandas = import_remote_packages("pandas")
         
-        # Create a simple array and perform operations
-        arr = numpy.array([1, 2, 3, 4, 5])
-        print(f"\n📊 Array: {arr}")
-        print(f"📈 Mean: {numpy.mean(arr)}")
-        print(f"📊 Standard deviation: {numpy.std(arr)}")
-        print(f"✨ Sum: {numpy.sum(arr)}")
+        print("✅ NumPy version:", numpy.__version__)
+        print("✅ Pandas version:", pandas.__version__)
+        
+        # Create a simple DataFrame
+        data = {
+            'Name': ['Alice', 'Bob', 'Charlie'],
+            'Age': [25, 30, 35],
+            'Salary': [50000, 60000, 75000]
+        }
+        df = pandas.DataFrame(data)
+        print("\n📊 DataFrame:")
+        print(df)
+        
+        # Perform some calculations
+        print("\n📈 Average Salary:", df['Salary'].mean())
+        print("📊 Age Statistics:")
+        print(df['Age'].describe())
     except Exception as e:
         print(f"❌ Error: {e}")

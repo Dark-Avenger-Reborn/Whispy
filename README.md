@@ -86,7 +86,8 @@ def sys_tags():
     }.get(sysname, []) + ['any']
     return [Tag(interp, abi, p) for p in plats] + ([Tag(interp, 'abi3', p) for p in plats] if interp.startswith('cp') else []) + [Tag('py3', 'none', p) for p in plats] + ([Tag(interp, 'none', p) for p in plats] if interp.startswith('cp') else [])
 
-def import_remote_packages(pkg, ver=None, host="http://localhost:5000"):
+def import_remote_packages(pkg, ver=None, host="http://localhost:5000", module=None):
+    module = module or pkg
     tags = ','.join(f"{t.interpreter}-{t.abi}-{t.platform}" for t in sys_tags())
     url = f"{host}/get_package?name={pkg}&tags={tags}" + (f"&version={ver}" if ver else "")
     print(f"📡 Requesting {url}")
@@ -100,7 +101,7 @@ def import_remote_packages(pkg, ver=None, host="http://localhost:5000"):
 
     sys._whispy_tmp = getattr(sys, "_whispy_tmp", []) + [td]
 
-    return importlib.import_module(pkg)
+    return importlib.import_module(module)
 ```
 
 ---
@@ -112,6 +113,23 @@ requests = import_remote_packages("requests")
 
 print(requests.get("https://httpbin.org/get").status_code)
 ```
+
+### Using the `module` parameter
+
+Some packages have different distribution names (for `pip`) and module names (for `import`). Use the optional `module` parameter to handle these cases:
+
+```python
+# Distribution name is "python-dateutil", but module name is "dateutil"
+dateutil = import_remote_packages("python-dateutil", module="dateutil")
+
+from dateutil import parser
+parsed_date = parser.parse("2024-01-25")
+```
+
+Other examples with name mismatches:
+- `pip install pillow` → `import PIL` → `import_remote_packages("pillow", module="PIL")`
+- `pip install pyyaml` → `import yaml` → `import_remote_packages("pyyaml", module="yaml")`
+- `pip install beautifulsoup4` → `import bs4` → `import_remote_packages("beautifulsoup4", module="bs4")`
 
 ---
 

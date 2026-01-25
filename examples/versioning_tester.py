@@ -1,6 +1,6 @@
 """
-Example: Using NumPy for numerical computing
-This demonstrates loading a package with compiled extensions dynamically
+Example: Using specific package versions
+This demonstrates how to load a specific version of a package
 """
 import sys, importlib, urllib.request, io, zipfile, tempfile, platform
 from collections import namedtuple
@@ -32,14 +32,20 @@ def import_remote_packages(pkg, ver=None, host="http://localhost:5000", module=N
 
 if __name__ == "__main__":
     try:
-        numpy = import_remote_packages("numpy")
-        print("✅ NumPy version:", numpy.__version__)
+        # Load humanize with a specific version
+        print("🔍 Loading humanize version 4.9.0...")
+        humanize = import_remote_packages("humanize", ver="4.9.0")
+        print("✅ humanize version:", humanize.__version__)
         
-        # Create a simple array and perform operations
-        arr = numpy.array([1, 2, 3, 4, 5])
-        print(f"\n📊 Array: {arr}")
-        print(f"📈 Mean: {numpy.mean(arr)}")
-        print(f"📊 Standard deviation: {numpy.std(arr)}")
-        print(f"✨ Sum: {numpy.sum(arr)}")
+        # Show some humanize functionality
+        import datetime
+        now = datetime.datetime.now()
+        past = now - datetime.timedelta(days=3, hours=5, minutes=30)
+        
+        print("\n📦 humanize functionality:")
+        print(f"  • Natural time: {humanize.naturaltime(past)}")
+        print(f"  • File size: {humanize.naturalsize(1024*1024*15)}")
+        print(f"  • Number: {humanize.intcomma(1234567)}")
+        print(f"  • Ordinal: {humanize.ordinal(42)}")
     except Exception as e:
         print(f"❌ Error: {e}")
