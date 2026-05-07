@@ -14,7 +14,6 @@ import time
 import urllib.parse
 import urllib.request
 import zipfile
-from collections import defaultdict
 from io import BytesIO
 from pathlib import Path
 from typing import Optional
