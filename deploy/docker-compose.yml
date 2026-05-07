@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  whispy:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: whispy-server:latest
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - whispy_cache:/app/cache
+    environment:
+      WHISPY_CACHE_DIR: /app/cache
+      WHISPY_MAX_CACHE_MB: 4096
+      # Optional: point to Redis for distributed rate limiting
+      # REDIS_URL: redis://redis:6379
+    labels:
+      # Traefik labels for reverse proxy (optional)
+      - "traefik.enable=true"
+      - "traefik.http.routers.whispy.rule=Host(`cdn.whispy.dev`)"
+      - "traefik.http.routers.whispy.tls=true"
+      - "traefik.http.routers.whispy.tls.certresolver=letsencrypt"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional Redis for production rate limiting (remove if not needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis_data:/data
+  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+volumes:
+  whispy_cache:
+    driver: local
+  # redis_data:
+  #   driver: local

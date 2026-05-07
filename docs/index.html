@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Whispy — Python Package CDN</title>
+  <meta name="description" content="Stream Python packages at runtime. No pip install. The PyPI CDN for ephemeral Python." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #06070a;
+      --bg2: #0d0f14;
+      --bg3: #13161d;
+      --border: rgba(255,255,255,0.06);
+      --border-bright: rgba(255,255,255,0.14);
+      --text: #e8eaf0;
+      --text-dim: #7a7f8e;
+      --text-dimmer: #454a57;
+      --accent: #5af0a0;
+      --accent2: #3dd6ff;
+      --accent3: #f0a05a;
+      --code-bg: #0a0c11;
+      --font-display: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-display);
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid noise texture overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(90,240,160,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 80%, rgba(61,214,255,0.03) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2.5rem;
+      height: 60px;
+      background: rgba(6,7,10,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-logo .logo-mark {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-badge {
+      background: var(--bg3);
+      border: 1px solid var(--border-bright);
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 8rem 2rem 6rem;
+      min-height: 90vh;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: 1px solid rgba(90,240,160,0.25);
+      background: rgba(90,240,160,0.05);
+      padding: 0.35rem 0.9rem;
+      border-radius: 100px;
+      margin-bottom: 2rem;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .hero-eyebrow::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    h1 {
+      font-size: clamp(3rem, 8vw, 6.5rem);
+      font-weight: 800;
+      line-height: 1.0;
+      letter-spacing: -0.04em;
+      margin-bottom: 1.5rem;
+      animation: fadeUp 0.6s 0.1s ease both;
+    }
+
+    h1 .accent { color: var(--accent); }
+    h1 .accent2 { color: var(--accent2); }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      color: var(--text-dim);
+      max-width: 540px;
+      margin: 0 auto 3rem;
+      font-weight: 400;
+      line-height: 1.7;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #06070a;
+      box-shadow: 0 0 20px rgba(90,240,160,0.25);
+    }
+
+    .btn-primary:hover { box-shadow: 0 0 32px rgba(90,240,160,0.4); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border-bright);
+    }
+
+    .btn-ghost:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
+
+    /* ── Terminal demo ── */
+    .hero-terminal {
+      margin: 4rem auto 0;
+      max-width: 620px;
+      width: 100%;
+      animation: fadeUp 0.6s 0.4s ease both;
+    }
+
+    .terminal {
+      background: var(--code-bg);
+      border: 1px solid var(--border-bright);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 32px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .terminal-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ff5f57; }
+    .dot-yellow { background: #febc2e; }
+    .dot-green { background: #28c840; }
+
+    .terminal-title {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dimmer);
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .terminal-body {
+      padding: 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.9;
+    }
+
+    .t-comment { color: var(--text-dimmer); }
+    .t-prompt { color: var(--accent); }
+    .t-out { color: var(--text-dim); }
+    .t-import { color: var(--accent2); }
+    .t-string { color: var(--accent3); }
+    .t-ok { color: var(--accent); }
+    .t-num { color: #c792ea; }
+
+    /* ── Sections ── */
+    section { position: relative; z-index: 1; }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dimmer);
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+
+    .section-desc {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      max-width: 520px;
+      line-height: 1.7;
+    }
+
+    /* ── Features grid ── */
+    .features {
+      padding: 8rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .features-header {
+      text-align: center;
+      margin-bottom: 5rem;
+    }
+
+    .features-header .section-desc { margin: 0 auto; }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .feature-card {
+      background: var(--bg);
+      padding: 2.5rem;
+      transition: background 0.2s;
+    }
+
+    .feature-card:hover { background: var(--bg2); }
+
+    .feature-icon {
+      font-size: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.6rem;
+      letter-spacing: -0.01em;
+    }
+
+    .feature-card p {
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      line-height: 1.7;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      margin-top: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      background: rgba(90,240,160,0.08);
+      color: var(--accent);
+      border: 1px solid rgba(90,240,160,0.2);
+    }
+
+    /* ── API Docs ── */
+    .docs {
+      padding: 8rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 4rem;
+      align-items: start;
+    }
+
+    .docs-nav {
+      position: sticky;
+      top: 80px;
+    }
+
+    .docs-nav-title {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dimmer);
+      margin-bottom: 1rem;
+    }
+
+    .docs-nav ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+
+    .docs-nav a {
+      display: block;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      text-decoration: none;
+      border-radius: 6px;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+
+    .docs-nav a:hover { color: var(--text); background: var(--bg2); }
+    .docs-nav a.active { color: var(--accent); background: rgba(90,240,160,0.08); }
+
+    .docs-content { min-width: 0; }
+
+    .doc-section { margin-bottom: 5rem; }
+
+    .doc-section h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .doc-section h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 2rem 0 0.75rem;
+      letter-spacing: -0.01em;
+    }
+
+    .doc-section p {
+      color: var(--text-dim);
+      line-height: 1.75;
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border-bright);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      margin: 1.25rem 0;
+      position: relative;
+    }
+
+    pre code {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.85;
+      color: var(--text);
+    }
+
+    code:not(pre code) {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+      background: var(--bg3);
+      padding: 0.15em 0.45em;
+      border-radius: 4px;
+      border: 1px solid var(--border-bright);
+      color: var(--accent2);
+    }
+
+    .endpoint {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      background: var(--bg3);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .method {
+      background: rgba(90,240,160,0.12);
+      color: var(--accent);
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      font-weight: 500;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+
+    .param-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 1.25rem 0;
+    }
+
+    .param-table th {
+      text-align: left;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border-bright);
+      color: var(--text-dim);
+      font-weight: 500;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .param-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-dim);
+      vertical-align: top;
+    }
+
+    .param-table td:first-child {
+      font-family: var(--font-mono);
+      color: var(--accent2);
+      font-size: 0.8rem;
+    }
+
+    .param-table tr:last-child td { border-bottom: none; }
+
+    .badge-required {
+      display: inline-block;
+      background: rgba(240,160,90,0.12);
+      color: var(--accent3);
+      border: 1px solid rgba(240,160,90,0.25);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      margin-left: 0.5rem;
+    }
+
+    .badge-optional {
+      display: inline-block;
+      background: rgba(122,127,142,0.12);
+      color: var(--text-dimmer);
+      border: 1px solid var(--border-bright);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      margin-left: 0.5rem;
+    }
+
+    /* ── Use cases ── */
+    .usecases {
+      padding: 8rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .cases-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.5rem;
+      margin-top: 4rem;
+    }
+
+    .case-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .case-card:hover {
+      border-color: var(--border-bright);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .case-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .case-card p {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      line-height: 1.7;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Install section ── */
+    .install {
+      padding: 8rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .install-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    /* ── Footer ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 3rem 0;
+      text-align: center;
+    }
+
+    footer p {
+      color: var(--text-dimmer);
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+
+    footer a { color: var(--text-dim); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .animate-in.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .docs-layout { grid-template-columns: 1fr; }
+      .docs-nav { display: none; }
+      .install-layout { grid-template-columns: 1fr; }
+      nav { padding: 0 1.25rem; }
+      .nav-links { gap: 1.25rem; }
+      .hero { padding: 5rem 1.25rem 4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <span class="logo-mark">W</span>
+    Whispy
+  </a>
+  <ul class="nav-links">
+    <li><a href="#docs">Docs</a></li>
+    <li><a href="#api">API</a></li>
+    <li><a href="#usecases">Use Cases</a></li>
+    <li><a href="https://github.com/Dark-Avenger-Reborn/Whispy">GitHub ↗</a></li>
+  </ul>
+  <span class="nav-badge">v1.0.0</span>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div>
+    <div class="hero-eyebrow">Now in Public Beta</div>
+    <h1>
+      The <span class="accent">PyPI</span><br />
+      <span class="accent2">CDN</span> for Python
+    </h1>
+    <p class="hero-sub">
+      Stream packages at runtime. No <code>pip install</code>, no virtual envs,
+      no environment setup. Dependencies as a network resource — just like the web.
+    </p>
+    <div class="hero-cta">
+      <a href="#docs" class="btn btn-primary">Get Started →</a>
+      <a href="https://github.com/Dark-Avenger-Reborn/Whispy" class="btn btn-ghost">View on GitHub</a>
+    </div>
+
+    <div class="hero-terminal">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="terminal-dot dot-red"></span>
+          <span class="terminal-dot dot-yellow"></span>
+          <span class="terminal-dot dot-green"></span>
+          <span class="terminal-title">script.py</span>
+        </div>
+        <div class="terminal-body">
+          <span class="t-comment"># Zero setup. No pip. No venv. Just import.</span><br />
+          <span class="t-import">from</span> whispy_client <span class="t-import">import</span> remote<br />
+          <br />
+          <span class="t-comment"># Fetch requests + all its deps at runtime</span><br />
+          requests = remote(<span class="t-string">"requests"</span>, deps=<span class="t-import">True</span>)<br />
+          numpy    = remote(<span class="t-string">"numpy==1.26.4"</span>)<br />
+          bs4      = remote(<span class="t-string">"beautifulsoup4"</span>, module=<span class="t-string">"bs4"</span>)<br />
+          <br />
+          r = requests.get(<span class="t-string">"https://httpbin.org/get"</span>)<br />
+          <span class="t-prompt">print</span>(r.status_code)  <span class="t-comment"># →</span> <span class="t-ok">200</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="container">
+    <div class="features-header animate-in">
+      <div class="section-label">Why Whispy</div>
+      <h2 class="section-title">Built for modern Python workflows</h2>
+      <p class="section-desc">
+        Whispy treats packages as network resources, not installed state.
+        Stream them in, use them, discard them.
+      </p>
+    </div>
+
+    <div class="features-grid animate-in">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Zero-install client</h3>
+        <p>The client has no runtime dependencies. One <code>pip install whispy-client</code> and you're done — or copy-paste the bootstrap for truly zero setup.</p>
+        <span class="feature-tag">stdlib only</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔐</div>
+        <h3>SHA-256 verified</h3>
+        <p>Every package is verified against PyPI's published SHA-256 digests before being served. Integrity is guaranteed end-to-end.</p>
+        <span class="feature-tag">immutable urls</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧩</div>
+        <h3>Automatic dep resolution</h3>
+        <p>Pass <code>deps=True</code> and Whispy resolves and bundles the full dependency graph alongside your package in a single request.</p>
+        <span class="feature-tag">recursive</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌍</div>
+        <h3>Edge-cached globally</h3>
+        <p>Deployed behind Cloudflare's global network. Versioned packages are cached at the edge with a 1-year immutable TTL.</p>
+        <span class="feature-tag">cloudflare cdn</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📐</div>
+        <h3>Smart platform matching</h3>
+        <p>Whispy computes your full PEP 425 tag list — including manylinux, musllinux, macOS universal2, and Windows ARM — and selects the best-matching wheel.</p>
+        <span class="feature-tag">pep 425</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">♻️</div>
+        <h3>Ephemeral by default</h3>
+        <p>Packages live in temp directories and disappear when your process exits. Your system stays clean, always.</p>
+        <span class="feature-tag">zero pollution</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section class="install" id="docs">
+  <div class="container">
+    <div class="install-layout">
+      <div class="animate-in">
+        <div class="section-label">Installation</div>
+        <h2 class="section-title">Up in 30 seconds</h2>
+        <p class="section-desc">
+          One install, then stream any package from PyPI on demand.
+          Works with Python 3.8+, any OS, no extra tools required.
+        </p>
+      </div>
+      <div class="animate-in">
+        <pre><code><span style="color:var(--text-dimmer)"># Install the client (once)</span>
+pip install whispy-client
+
+<span style="color:var(--text-dimmer)"># Use it anywhere</span>
+<span style="color:var(--accent2)">from</span> whispy_client <span style="color:var(--accent2)">import</span> remote
+
+requests = remote(<span style="color:var(--accent3)">"requests"</span>)
+numpy    = remote(<span style="color:var(--accent3)">"numpy==1.26.4"</span>)
+
+<span style="color:var(--text-dimmer)"># Version-pinned, SHA-256 verified,
+# edge-cached, zero install on the system.</span>
+</code></pre>
+        <pre><code><span style="color:var(--text-dimmer)"># Override host for local dev / self-hosted</span>
+<span style="color:var(--accent2)">from</span> whispy_client <span style="color:var(--accent2)">import</span> remote, configure
+
+configure(host=<span style="color:var(--accent3)">"http://localhost:5000"</span>, verbose=<span style="color:var(--accent2)">True</span>)
+requests = remote(<span style="color:var(--accent3)">"requests"</span>, deps=<span style="color:var(--accent2)">True</span>)
+</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- API DOCS -->
+<section class="docs" id="api">
+  <div class="container">
+    <div class="docs-layout">
+      <nav class="docs-nav">
+        <div class="docs-nav-title">On this page</div>
+        <ul>
+          <li><a href="#api-remote" class="active">remote()</a></li>
+          <li><a href="#api-configure">configure()</a></li>
+          <li><a href="#api-get-package">GET /get_package</a></li>
+          <li><a href="#api-metadata">GET /metadata</a></li>
+          <li><a href="#api-health">GET /health</a></li>
+          <li><a href="#api-self-host">Self-hosting</a></li>
+        </ul>
+      </nav>
+
+      <div class="docs-content">
+        <!-- remote() -->
+        <div class="doc-section" id="api-remote">
+          <h2>remote()</h2>
+          <p>Import a package from the Whispy CDN at runtime and return the module object.</p>
+          <pre><code>remote(
+  package: str,
+  *,
+  module:  str  = None,
+  version: str  = None,
+  deps:    bool = False,
+  host:    str  = None,
+) -> ModuleType</code></pre>
+
+          <h3>Parameters</h3>
+          <table class="param-table">
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>package<span class="badge-required">required</span></td>
+                <td>str</td>
+                <td>PyPI distribution name. Accepts bare name <code>"requests"</code> or pinned spec <code>"requests==2.31.0"</code>.</td>
+              </tr>
+              <tr>
+                <td>module<span class="badge-optional">optional</span></td>
+                <td>str</td>
+                <td>Import name when it differs from the distribution name, e.g. <code>module="bs4"</code> for <code>"beautifulsoup4"</code>.</td>
+              </tr>
+              <tr>
+                <td>version<span class="badge-optional">optional</span></td>
+                <td>str</td>
+                <td>Explicit version string. Overrides any spec embedded in <code>package</code>.</td>
+              </tr>
+              <tr>
+                <td>deps<span class="badge-optional">optional</span></td>
+                <td>bool</td>
+                <td>If <code>True</code>, resolve and bundle all transitive dependencies. Defaults to the global <code>configure()</code> setting.</td>
+              </tr>
+              <tr>
+                <td>host<span class="badge-optional">optional</span></td>
+                <td>str</td>
+                <td>CDN base URL override for this call only. Useful for testing against a local server.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Common name mismatches</h3>
+          <pre><code>bs4      = remote(<span style="color:var(--accent3)">"beautifulsoup4"</span>, module=<span style="color:var(--accent3)">"bs4"</span>)
+PIL      = remote(<span style="color:var(--accent3)">"pillow"</span>,         module=<span style="color:var(--accent3)">"PIL"</span>)
+yaml     = remote(<span style="color:var(--accent3)">"pyyaml"</span>,         module=<span style="color:var(--accent3)">"yaml"</span>)
+dateutil = remote(<span style="color:var(--accent3)">"python-dateutil"</span>, module=<span style="color:var(--accent3)">"dateutil"</span>)
+cv2      = remote(<span style="color:var(--accent3)">"opencv-python"</span>,  module=<span style="color:var(--accent3)">"cv2"</span>)</code></pre>
+        </div>
+
+        <!-- configure() -->
+        <div class="doc-section" id="api-configure">
+          <h2>configure()</h2>
+          <p>Set global defaults for all subsequent <code>remote()</code> calls.</p>
+          <pre><code>configure(
+  *,
+  host:    str  = None,   <span style="color:var(--text-dimmer)"># CDN base URL</span>
+  deps:    bool = None,   <span style="color:var(--text-dimmer)"># auto-fetch dependencies</span>
+  verbose: bool = None,   <span style="color:var(--text-dimmer)"># print progress</span>
+)</code></pre>
+          <p>You can also configure via the <code>WHISPY_HOST</code> environment variable:</p>
+          <pre><code>WHISPY_HOST=http://localhost:5000 python my_script.py</code></pre>
+        </div>
+
+        <!-- GET /get_package -->
+        <div class="doc-section" id="api-get-package">
+          <h2>GET /get_package</h2>
+          <p>Resolve, verify, and return a zip containing the package (and optionally its deps) ready for <code>sys.path</code> insertion.</p>
+          <div class="endpoint">
+            <span class="method">GET</span>
+            <span>/get_package</span>
+          </div>
+          <table class="param-table">
+            <thead><tr><th>Param</th><th>Required</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>name</td><td><span class="badge-required">required</span></td><td>PyPI distribution name</td></tr>
+              <tr><td>tags</td><td><span class="badge-required">required</span></td><td>Comma-separated PEP 425 tags, most-specific first</td></tr>
+              <tr><td>version</td><td><span class="badge-optional">optional</span></td><td>Exact version. Omit to resolve latest.</td></tr>
+              <tr><td>deps</td><td><span class="badge-optional">optional</span></td><td><code>1</code> to include transitive dependencies</td></tr>
+            </tbody>
+          </table>
+          <p>Response headers include <code>X-Whispy-Version-Resolved</code> (actual version served) and <code>X-Whispy-Manifest</code> (JSON array of all packages in the zip).</p>
+        </div>
+
+        <!-- GET /metadata -->
+        <div class="doc-section" id="api-metadata">
+          <h2>GET /metadata/:package</h2>
+          <p>Fetch normalized PyPI metadata for a package without downloading it.</p>
+          <div class="endpoint">
+            <span class="method">GET</span>
+            <span>/metadata/{package}?version=2.31.0</span>
+          </div>
+          <pre><code>{
+  "name": "requests",
+  "version": "2.31.0",
+  "summary": "Python HTTP for Humans.",
+  "requires_python": ">=3.7",
+  "requires_dist": ["charset-normalizer ...", "idna ...", ...],
+  "license": "Apache 2.0"
+}</code></pre>
+        </div>
+
+        <!-- GET /health -->
+        <div class="doc-section" id="api-health">
+          <h2>GET /health</h2>
+          <p>Server health and cache statistics. Not rate-limited.</p>
+          <pre><code>{
+  "status": "ok",
+  "cache_entries": 142,
+  "cache_mb": 918.4,
+  "max_cache_mb": 4096
+}</code></pre>
+        </div>
+
+        <!-- Self-hosting -->
+        <div class="doc-section" id="api-self-host">
+          <h2>Self-hosting</h2>
+          <p>Run your own Whispy instance for internal tools, air-gapped environments, or maximum control.</p>
+          <pre><code><span style="color:var(--text-dimmer)"># Docker (recommended)</span>
+docker run -d \
+  -p 8000:8000 \
+  -v whispy_cache:/app/cache \
+  -e WHISPY_MAX_CACHE_MB=4096 \
+  ghcr.io/dark-avenger-reborn/whispy-server:latest
+
+<span style="color:var(--text-dimmer)"># Or with docker compose</span>
+git clone https://github.com/Dark-Avenger-Reborn/Whispy
+cd Whispy
+docker compose -f deploy/docker-compose.yml up -d</code></pre>
+          <p>Then point your client at your instance:</p>
+          <pre><code>configure(host=<span style="color:var(--accent3)">"http://your-server:8000"</span>)</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section class="usecases" id="usecases">
+  <div class="container">
+    <div class="animate-in" style="margin-bottom: 1rem;">
+      <div class="section-label">Use Cases</div>
+      <h2 class="section-title">Built for these moments</h2>
+    </div>
+    <div class="cases-grid animate-in">
+      <div class="case-card">
+        <h3>🎓 Education</h3>
+        <p>Students run Python scripts without pip, venvs, or permissions. Share a single .py file and it just works on any machine.</p>
+        <pre><code><span style="color:var(--accent2)">from</span> whispy_client <span style="color:var(--accent2)">import</span> remote
+matplotlib = remote(<span style="color:var(--accent3)">"matplotlib"</span>, deps=<span style="color:var(--accent2)">True</span>)
+<span style="color:var(--text-dimmer)"># No "install matplotlib first"</span></code></pre>
+      </div>
+      <div class="case-card">
+        <h3>☁️ Serverless / Lambda</h3>
+        <p>Hydrate dependencies at cold-start instead of bundling them into your deployment package. Smaller deploys, faster CI.</p>
+        <pre><code><span style="color:var(--text-dimmer)"># In your Lambda handler</span>
+configure(host=<span style="color:var(--accent3)">"https://cdn.whispy.dev"</span>)
+httpx = remote(<span style="color:var(--accent3)">"httpx==0.27.0"</span>, deps=<span style="color:var(--accent2)">True</span>)</code></pre>
+      </div>
+      <div class="case-card">
+        <h3>🔌 Plugin systems</h3>
+        <p>Load capabilities at runtime based on user config. No need to bundle every possible plugin — fetch on demand.</p>
+        <pre><code><span style="color:var(--text-dimmer)"># Load the plugin the user actually needs</span>
+plugin_name = config[<span style="color:var(--accent3)">"export_format"</span>]
+plugin = remote(f<span style="color:var(--accent3)">"whispy-plugin-{plugin_name}"</span>)</code></pre>
+      </div>
+      <div class="case-card">
+        <h3>🧪 Ephemeral scripts</h3>
+        <p>One-off data scripts that need a heavy library once. Import it, use it, and leave the system exactly as you found it.</p>
+        <pre><code>pandas = remote(<span style="color:var(--accent3)">"pandas"</span>, deps=<span style="color:var(--accent2)">True</span>)
+df = pandas.read_csv(<span style="color:var(--accent3)">"data.csv"</span>)
+<span style="color:var(--text-dimmer)"># pandas vanishes when process exits</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <p>
+      Built by <a href="https://github.com/Dark-Avenger-Reborn">Dark-Avenger-Reborn</a> ·
+      <a href="https://github.com/Dark-Avenger-Reborn/Whispy">GitHub</a> ·
+      MIT License · Packages sourced from <a href="https://pypi.org">PyPI</a>
+    </p>
+  </div>
+</footer>
+
+<script>
+  // Intersection observer for scroll animations
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+  document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+
+  // Active nav link highlighting
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('.docs-nav a');
+
+  const linkObserver = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`.docs-nav a[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.5 });
+
+  sections.forEach(s => linkObserver.observe(s));
+</script>
+</body>
+</html>
