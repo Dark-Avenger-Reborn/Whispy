@@ -3,7 +3,7 @@ version: "3.9"
 services:
   whispy:
     build:
-      context: ./server
+      context: ../server
       dockerfile: Dockerfile
     image: whispy-server:latest
     restart: unless-stopped
