@@ -41,3 +41,6 @@ node_modules/
 # Secrets
 .env.local
 secrets.json
+
+
+.ruff_cache/

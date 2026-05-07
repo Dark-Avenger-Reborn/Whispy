@@ -11,7 +11,6 @@ Usage:
 
 from __future__ import annotations
 
-import hashlib
 import importlib
 import io
 import json
@@ -22,7 +21,6 @@ import tempfile
 import urllib.error
 import urllib.request
 import zipfile
-from pathlib import Path
 from typing import Optional
 
 __version__ = "1.0.0"
