@@ -207,7 +207,6 @@ def _compute_tags() -> list[str]:
         abi_tags = [abi_base, "abi3", "none"]
         interp_tags = [interp_base, f"cp{vi.major}", "py3", f"py{vi.major}{vi.minor}"]
     elif impl == "PyPy":
-        pv = getattr(sys, "pypy_version_info", vi)
         interp_base = f"pp{vi.major}{vi.minor}"
         abi_base = f"pypy{vi.major}{vi.minor}"
         abi_tags = [abi_base, "none"]
