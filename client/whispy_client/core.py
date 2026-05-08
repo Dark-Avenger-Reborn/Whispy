@@ -137,7 +137,7 @@ def remote(
         raise WhispyError(f"Could not reach Whispy CDN at {resolved_host}: {e}") from e
 
     # Extract into a TemporaryDirectory that lives for the process lifetime
-    tmpdir = tempfile.TemporaryDirectory(prefix="whispy_")
+    tmpdir = tempfile.TemporaryDirectory(prefix="whispy_", ignore_cleanup_errors=True)
     _live_tmpdirs.append(tmpdir)
 
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
