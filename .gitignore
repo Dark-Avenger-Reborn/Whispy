@@ -44,3 +44,4 @@ secrets.json
 
 
 .ruff_cache/
+test.py
