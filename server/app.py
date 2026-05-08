@@ -160,7 +160,7 @@ def resolve_dependencies(package: str, version: str) -> list[dict]:
         resolved[norm] = {
             "name": norm,
             "version": actual_ver,
-            "files": meta["releases"].get(actual_ver, []),
+            "files": meta.get("releases", {}).get(actual_ver, []) or meta.get("urls", []),
             "requires_python": info.get("requires_python"),
         }
 
@@ -337,7 +337,7 @@ def fetch_package_zip(
         pkg_list = [{
             "name": _normalize_name(package),
             "version": resolved_version,
-            "files": meta["releases"].get(resolved_version, []),
+            "files": meta.get("releases", {}).get(resolved_version, []) or meta.get("urls", []),
         }]
 
     manifest = []
@@ -387,6 +387,11 @@ def fetch_package_zip(
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+@app.before_request
+def verify_secret():
+    secret = os.environ.get("WHISPY_SECRET")
+    if secret and request.headers.get("X-Whispy-Secret") != secret:
+        return jsonify({"error": "Forbidden"}), 403
 
 @app.before_request
 def _start_timer():
