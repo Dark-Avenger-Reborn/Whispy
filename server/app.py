@@ -502,6 +502,10 @@ def stats():
         "cache_limit_mb": MAX_CACHE_BYTES // 1024 // 1024,
     })
 
+@app.route("/")
+@limiter.exempt
+def index():
+    return send_file(Path(__file__).resolve().parent / "../docs/index.html")
 
 @app.errorhandler(429)
 def rate_limited(e):
