@@ -377,7 +377,7 @@
 
     .docs-layout {
       display: grid;
-      grid-template-columns: 220px 1fr;
+      grid-template-columns: 280px 1fr;
       gap: 4rem;
       align-items: start;
     }
@@ -385,22 +385,34 @@
     .docs-nav {
       position: sticky;
       top: 80px;
+      background: var(--bg2);
+      border: 1px solid var(--border-bright);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
     }
 
     .docs-nav-title {
       font-family: var(--font-mono);
-      font-size: 0.65rem;
-      letter-spacing: 0.12em;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text-dimmer);
-      margin-bottom: 1rem;
+      margin: 0 0 1rem 0;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
     }
 
     .docs-nav ul {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 0.1rem;
+      gap: 0.75rem;
+      width: 100%;
+      margin: 0;
+      padding: 0;
     }
 
     .docs-nav a {
@@ -661,7 +673,7 @@
     <li><a href="#usecases">Use Cases</a></li>
     <li><a href="https://github.com/Dark-Avenger-Reborn/Whispy">GitHub ↗</a></li>
   </ul>
-  <span class="nav-badge">v1.0.0</span>
+  <span class="nav-badge">v1.1.0</span>
 </nav>
 
 <!-- HERO -->
@@ -739,9 +751,9 @@
       </div>
       <div class="feature-card">
         <div class="feature-icon">🌍</div>
-        <h3>Edge-cached globally</h3>
-        <p>Deployed behind Cloudflare's global network. Versioned packages are cached at the edge with a 1-year immutable TTL.</p>
-        <span class="feature-tag">cloudflare cdn</span>
+        <h3>Self-hosted ready</h3>
+        <p>Designed for self-hosted deployments. Run your own instance behind any CDN or load balancer for maximum control and privacy.</p>
+        <span class="feature-tag">http api</span>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📐</div>
@@ -934,20 +946,19 @@ cv2      = remote(<span style="color:var(--accent3)">"opencv-python"</span>,  mo
         <!-- Self-hosting -->
         <div class="doc-section" id="api-self-host">
           <h2>Self-hosting</h2>
-          <p>Run your own Whispy instance for internal tools, air-gapped environments, or maximum control.</p>
-          <pre><code><span style="color:var(--text-dimmer)"># Docker (recommended)</span>
-docker run -d \
-  -p 8000:8000 \
-  -v whispy_cache:/app/cache \
-  -e WHISPY_MAX_CACHE_MB=4096 \
-  ghcr.io/dark-avenger-reborn/whispy-server:latest
+          <p>Run your own Whispy instance for internal tools, air-gapped environments, or maximum control. The server is a simple Flask app with zero external dependencies.</p>
+          <pre><code><span style="color:var(--text-dimmer)"># Install server dependencies</span>
+cd server
+pip install -r requirements.txt
 
-<span style="color:var(--text-dimmer)"># Or with docker compose</span>
-git clone https://github.com/Dark-Avenger-Reborn/Whispy
-cd Whispy
-docker compose -f deploy/docker-compose.yml up -d</code></pre>
+<span style="color:var(--text-dimmer)"># Run locally (development)</span>
+python app.py --debug
+
+<span style="color:var(--text-dimmer)"># Or with gunicorn (production)</span>
+gunicorn app:app -w 4 -b 0.0.0.0:8000</code></pre>
           <p>Then point your client at your instance:</p>
           <pre><code>configure(host=<span style="color:var(--accent3)">"http://your-server:8000"</span>)</code></pre>
+          <p>See the <a href="https://github.com/Dark-Avenger-Reborn/Whispy/blob/main/server/app.py" style="color: var(--accent2); text-decoration: none;">server/app.py</a> source for configuration options like <code>WHISPY_CACHE_DIR</code>, <code>WHISPY_MAX_CACHE_MB</code>, and <code>REDIS_URL</code>.</p>
         </div>
       </div>
     </div>

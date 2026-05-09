@@ -23,7 +23,7 @@ import urllib.request
 import zipfile
 from typing import Optional
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = ["remote", "configure", "WhispyError"]
 
 # ---------------------------------------------------------------------------

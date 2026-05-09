@@ -30,11 +30,17 @@ Browse the source on [GitHub](https://github.com/Dark-Avenger-Reborn/Whispy) if 
 - A notebook or one-off script that needs `requests`, `numpy`, or `bs4` without setting up a virtual environment.
 - A throwaway automation job that should not leave packages installed on disk.
 - A controlled runtime where you want to fetch only the wheel that matches the current interpreter and platform.
-- A self-hosted setup where you want to point [whispy_client](https://github.com/Dark-Avenger-Reborn/Whispy/tree/testing_new/client) at your own server from the [repo source](https://github.com/Dark-Avenger-Reborn/Whispy).
+- A self-hosted setup where you want to point [whispy_client](https://github.com/Dark-Avenger-Reborn/Whispy/tree/main/client) at your own server from the [repo source](https://github.com/Dark-Avenger-Reborn/Whispy).
 
 ## Quick Start
 
-### Install the client from this repo
+### Install the client from PyPI
+
+```bash
+pip install whispy-client
+```
+
+### Or install from source (development)
 
 ```bash
 cd client
@@ -57,7 +63,7 @@ print(requests.get("https://httpbin.org/get").status_code)
 
 Default host: `https://cdn.whispycdn.dev`. Override it per call with `host=...`, or globally with `configure(host=...)` or `WHISPY_HOST`.
 
-If you want the exact implementation, start with the [client package in the repo](https://github.com/Dark-Avenger-Reborn/Whispy/tree/testing_new/client) and the [server entrypoint](https://github.com/Dark-Avenger-Reborn/Whispy/blob/testing_new/server/app.py).
+If you want the exact implementation, start with the [client package in the repo](https://github.com/Dark-Avenger-Reborn/Whispy/tree/main/client) and the [server entrypoint](https://github.com/Dark-Avenger-Reborn/Whispy/blob/main/server/app.py).
 
 Common examples:
 

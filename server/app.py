@@ -402,7 +402,7 @@ def _start_timer():
 def _log_request(resp):
     duration = (time.monotonic() - g.start) * 1000
     log.info("%s %s %d %.1fms", request.method, request.path, resp.status_code, duration)
-    resp.headers["X-Whispy-Version"] = "1.0.0"
+    resp.headers["X-Whispy-Version"] = "1.1.0"
     return resp
 
 

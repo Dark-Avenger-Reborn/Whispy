@@ -13,7 +13,7 @@
 
 </div>
 
-The client lives in the [Whispy repository](https://github.com/Dark-Avenger-Reborn/Whispy), with the implementation in [client/whispy_client](https://github.com/Dark-Avenger-Reborn/Whispy/tree/testing_new/client/whispy_client) and the server entrypoint in [server/app.py](../server/app.py). It downloads a bundle from a Whispy server, extracts it to a temporary directory, and imports the requested module at runtime.
+The client lives in the [Whispy repository](https://github.com/Dark-Avenger-Reborn/Whispy), with the implementation in [client/whispy_client](https://github.com/Dark-Avenger-Reborn/Whispy/tree/main/client/whispy_client) and the server entrypoint in [server/app.py](../server/app.py). It downloads a bundle from a Whispy server, extracts it to a temporary directory, and imports the requested module at runtime.
 
 ## When to Use It
 
