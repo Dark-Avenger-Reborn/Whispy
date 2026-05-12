@@ -243,10 +243,14 @@ def download_package_to_dir(pkg_files: list[dict], client_tags: list[str], dest_
     if chosen["filename"].endswith(".whl") or chosen["filename"].endswith(".zip"):
         with zipfile.ZipFile(tmp, "r") as z:
             z.extractall(dest_dir)
+            # Log extraction for debugging
+            extracted_files = z.namelist()
+            log.debug("Extracted %d files from %s", len(extracted_files), chosen["filename"])
     else:
         import tarfile
         with tarfile.open(tmp, "r:gz") as t:
             t.extractall(dest_dir)
+            log.debug("Extracted tarfile %s", chosen["filename"])
 
     tmp.unlink()
     return chosen["filename"]
@@ -354,11 +358,18 @@ def fetch_package_zip(
                     if f["filename"] == chosen_filename:
                         sha = f.get("digests", {}).get("sha256")
                         break
+                
+                # Validate that files were actually extracted
+                extracted_items = list(pkg_dir.rglob("*"))
+                if not extracted_items:
+                    raise RuntimeError(f"No files extracted from {chosen_filename}")
+                
                 manifest.append({
                     "name": pkg["name"],
                     "version": pkg["version"],
                     "filename": chosen_filename,
                     "sha256": sha,
+                    "items_extracted": len([f for f in extracted_items if f.is_file()]),
                 })
             except Exception as e:
                 log.warning("Could not fetch %s: %s", pkg["name"], e)
@@ -366,13 +377,24 @@ def fetch_package_zip(
         # Zip everything up
         zip_tmp = tmp / "bundle.zip"
         with zipfile.ZipFile(zip_tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+            file_count = 0
             for item in tmp.rglob("*"):
                 if item == zip_tmp or not item.is_file():
                     continue
                 # Strip the per-package subdir so all modules land at root
-                pkg_name = item.relative_to(tmp).parts[0]
-                arcname = item.relative_to(tmp / pkg_name)
-                zf.write(item, arcname)
+                try:
+                    pkg_name = item.relative_to(tmp).parts[0]
+                    arcname = item.relative_to(tmp / pkg_name)
+                    zf.write(item, arcname)
+                    file_count += 1
+                except Exception as e:
+                    log.warning("Failed to add file %s to zip: %s", item, e)
+                    continue
+        
+        log.info("Zipped %d files for package %s v%s", file_count, package, resolved_version)
+        
+        if file_count == 0:
+            raise RuntimeError(f"No files were added to the package bundle for {package}")
 
         cached_path = cache_put(key, zip_tmp)
 

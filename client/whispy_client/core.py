@@ -152,15 +152,73 @@ def remote(
     try:
         return importlib.import_module(resolved_module)
     except ModuleNotFoundError as e:
+        # Try to find the module in subdirectories (helps with complex wheel structures)
+        found_module = _find_and_import_module(resolved_module, tmpdir.name, verbose)
+        if found_module is not None:
+            return found_module
+        
+        # If not found, provide detailed diagnostics
+        import os
+        extracted_items = []
+        try:
+            for item in os.listdir(tmpdir.name):
+                item_path = os.path.join(tmpdir.name, item)
+                if os.path.isdir(item_path):
+                    extracted_items.append(f"  [DIR]  {item}/")
+                else:
+                    extracted_items.append(f"  [FILE] {item}")
+        except Exception:
+            extracted_items.append("  (could not list directory)")
+        
+        extracted_str = "\n".join(extracted_items[:20])  # Show first 20 items
+        if len(extracted_items) > 20:
+            extracted_str += f"\n  ... and {len(extracted_items) - 20} more items"
+        
         raise WhispyError(
-            f"Package '{pkg_name}' was downloaded but module '{resolved_module}' could not be imported. "
-            f"Try setting module= explicitly. Original error: {e}"
+            f"Package '{pkg_name}' was downloaded but module '{resolved_module}' could not be imported.\n"
+            f"Try setting module= explicitly. Original error: {e}\n"
+            f"Extracted contents:\n{extracted_str}"
         ) from e
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _find_and_import_module(module_name: str, search_dir: str, verbose: bool = False) -> Optional[object]:
+    """
+    Try to find and import a module by searching in subdirectories.
+    This handles cases where the wheel extraction creates unexpected directory structures.
+    Returns the imported module if found, or None if not found.
+    """
+    import os
+    
+    # Try one level of subdirectories
+    try:
+        for item in os.listdir(search_dir):
+            item_path = os.path.join(search_dir, item)
+            if os.path.isdir(item_path) and item not in sys.path:
+                # Skip .dist-info directories
+                if item.endswith('.dist-info') or item.endswith('.data'):
+                    continue
+                # Try adding this directory to sys.path
+                sys.path.insert(0, item_path)
+                try:
+                    if verbose:
+                        print(f"🌀 Whispy: trying to import {module_name} from {item_path}")
+                    result = importlib.import_module(module_name)
+                    if verbose:
+                        print(f"✅ Whispy: successfully imported {module_name} from {item_path}")
+                    return result
+                except ModuleNotFoundError:
+                    # Remove this path since it didn't work
+                    sys.path.pop(0)
+                    continue
+    except Exception:
+        pass
+    
+    return None
+
 
 def _parse_package_spec(spec: str) -> tuple[str, Optional[str]]:
     """
