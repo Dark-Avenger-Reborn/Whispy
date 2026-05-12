@@ -95,8 +95,45 @@ def parse_wheel_tags(filename: str) -> set[str]:
 
 
 def tags_compatible(wheel_tags: set[str], client_tags: list[str]) -> bool:
+    """Check if wheel is compatible with client. Handles abi3 wheels specially."""
     client_set = set(client_tags)
-    return bool(wheel_tags & client_set)
+    
+    # Direct match
+    if wheel_tags & client_set:
+        return True
+    
+    # Check for abi3 (stable ABI) compatibility
+    # A cp39-abi3-win_amd64 wheel works with cp310, cp311, cp312, ... cp314, etc
+    for wheel_tag in wheel_tags:
+        parts = wheel_tag.split("-")
+        if len(parts) == 3 and parts[1] == "abi3":
+            wheel_interp = parts[0]  # e.g., "cp39"
+            wheel_plat = parts[2]     # e.g., "win_amd64"
+            
+            # Extract interpreter and platform from client tags
+            for client_tag in client_tags:
+                client_parts = client_tag.split("-")
+                if len(client_parts) == 3:
+                    client_interp = client_parts[0]
+                    client_abi = client_parts[1]
+                    client_plat = client_parts[2]
+                    
+                    # Platform must match
+                    if client_plat != wheel_plat:
+                        continue
+                    
+                    # Extract version numbers from interpreters (e.g., "cp39" -> 39, "cp314" -> 314)
+                    try:
+                        wheel_version = int(wheel_interp[2:]) if wheel_interp.startswith("cp") else 0
+                        client_version = int(client_interp[2:]) if client_interp.startswith("cp") else 0
+                        
+                        # Client version must be >= wheel version for abi3 to work
+                        if client_version >= wheel_version:
+                            return True
+                    except (ValueError, IndexError):
+                        pass
+    
+    return False
 
 
 def rank_wheel(filename: str, client_tags: list[str]) -> int:
@@ -105,9 +142,39 @@ def rank_wheel(filename: str, client_tags: list[str]) -> int:
     in the client's ordered tag list (most-specific first).
     """
     wheel_tags = parse_wheel_tags(filename)
+    
+    # First check direct matches
     for i, tag in enumerate(client_tags):
         if tag in wheel_tags:
             return i
+    
+    # Then check abi3 compatibility
+    for wheel_tag in wheel_tags:
+        parts = wheel_tag.split("-")
+        if len(parts) == 3 and parts[1] == "abi3":
+            wheel_interp = parts[0]
+            wheel_plat = parts[2]
+            
+            for j, client_tag in enumerate(client_tags):
+                client_parts = client_tag.split("-")
+                if len(client_parts) == 3:
+                    client_interp = client_parts[0]
+                    client_plat = client_parts[2]
+                    
+                    if client_plat != wheel_plat:
+                        continue
+                    
+                    try:
+                        wheel_version = int(wheel_interp[2:]) if wheel_interp.startswith("cp") else 0
+                        client_version = int(client_interp[2:]) if client_interp.startswith("cp") else 0
+                        
+                        if client_version >= wheel_version:
+                            # Return a score based on how old the wheel is
+                            # Prefer newer compatible wheels (lower score = better)
+                            return 10000 + (wheel_version * 100) + j
+                    except (ValueError, IndexError):
+                        pass
+    
     return 999999
 
 
@@ -205,11 +272,26 @@ def _best_wheel(files: list[dict], client_tags: list[str]) -> Optional[dict]:
         w for w in wheels
         if tags_compatible(parse_wheel_tags(w["filename"]), client_tags)
     ]
+    
+    # Log details for debugging
+    if wheels:
+        log.debug("Found %d wheels, %d compatible. Available wheels:", len(wheels), len(compatible))
+        for w in wheels[:10]:  # Log first 10 wheels
+            tags = parse_wheel_tags(w["filename"])
+            is_compat = w in compatible
+            log.debug("  %s - tags=%s - compatible=%s", w["filename"], tags, is_compat)
+        if len(wheels) > 10:
+            log.debug("  ... and %d more wheels", len(wheels) - 10)
+    
     if not compatible:
+        log.warning("No compatible wheels found. Client tags: %s", client_tags[:10])
         return None
+    
     # Sort by rank (most specific match first)
     compatible.sort(key=lambda w: rank_wheel(w["filename"], client_tags))
-    return compatible[0]
+    best = compatible[0]
+    log.info("Selected wheel: %s", best["filename"])
+    return best
 
 
 def _sdist(files: list[dict]) -> Optional[dict]:
@@ -226,6 +308,9 @@ def download_package_to_dir(pkg_files: list[dict], client_tags: list[str], dest_
     if not chosen:
         raise RuntimeError("No compatible distribution found")
 
+    dist_type = "wheel" if best else "sdist"
+    log.info("Downloading %s (%s)", chosen["filename"], dist_type)
+    
     tmp = dest_dir / chosen["filename"]
     _download(chosen["url"], tmp)
 
@@ -361,18 +446,24 @@ def fetch_package_zip(
                 
                 # Validate that files were actually extracted
                 extracted_items = list(pkg_dir.rglob("*"))
-                if not extracted_items:
-                    raise RuntimeError(f"No files extracted from {chosen_filename}")
+                files_count = len([f for f in extracted_items if f.is_file()])
+                if files_count == 0:
+                    raise RuntimeError(f"No files extracted from {chosen_filename} (extracted {len(extracted_items)} total items)")
                 
                 manifest.append({
                     "name": pkg["name"],
                     "version": pkg["version"],
                     "filename": chosen_filename,
                     "sha256": sha,
-                    "items_extracted": len([f for f in extracted_items if f.is_file()]),
+                    "items_extracted": files_count,
                 })
+                log.info("Successfully extracted %d files from %s for %s", files_count, chosen_filename, pkg["name"])
             except Exception as e:
-                log.warning("Could not fetch %s: %s", pkg["name"], e)
+                log.error("Could not fetch %s: %s", pkg["name"], e, exc_info=True)
+
+        # Check if any packages were successfully extracted
+        if not manifest:
+            raise RuntimeError(f"No packages were successfully downloaded for {package}. Check server logs for details.")
 
         # Zip everything up
         zip_tmp = tmp / "bundle.zip"
@@ -394,7 +485,7 @@ def fetch_package_zip(
         log.info("Zipped %d files for package %s v%s", file_count, package, resolved_version)
         
         if file_count == 0:
-            raise RuntimeError(f"No files were added to the package bundle for {package}")
+            raise RuntimeError(f"No files were added to the package bundle for {package}. Extracted {sum(m['items_extracted'] for m in manifest)} files but zip is empty.")
 
         cached_path = cache_put(key, zip_tmp)
 
