@@ -30,11 +30,15 @@ from whispy_client import remote, configure
 configure(verbose=True)
 
 requests = remote("requests")
-numpy = remote("numpy")
+numpy = remote("numpy", version="1.26.4")
 bs4 = remote("beautifulsoup4", module="bs4", deps=True)
 ```
 
 ```python
+# Version pinning (use the version parameter)
+requests = remote("requests", version="2.31.0")
+numpy = remote("numpy", version="1.26.4")
+
 # Common import name mismatches
 bs4 = remote("beautifulsoup4", module="bs4")
 PIL = remote("pillow", module="PIL")

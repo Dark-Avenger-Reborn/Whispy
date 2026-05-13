@@ -55,7 +55,7 @@ from whispy_client import remote, configure
 configure(verbose=True)
 
 requests = remote("requests")
-numpy = remote("numpy")
+numpy = remote("numpy", version="1.26.4")
 bs4 = remote("beautifulsoup4", module="bs4", deps=True)
 
 print(requests.get("https://httpbin.org/get").status_code)
@@ -68,11 +68,11 @@ If you want the exact implementation, start with the [client package in the repo
 Common examples:
 
 ```python
-# Import the package that matches the distribution name
+# Import the package (latest version from PyPI)
 requests = remote("requests")
 
-# Common import name mismatches
-bs4 = remote("beautifulsoup4", module="bs4")
+# Pin to an exact version
+numpy = remote("numpy", version="1.26.4")
 
 # Map a distribution name to a different import name
 bs4 = remote("beautifulsoup4", module="bs4")

@@ -5,7 +5,7 @@ Usage:
     from whispy_client import remote
 
     requests = remote("requests")
-    numpy = remote("numpy")
+    numpy = remote("numpy", version="1.26.4")
     bs4 = remote("beautifulsoup4", module="bs4", deps=True)
 """
 
@@ -84,11 +84,10 @@ def remote(
     Import a package from the Whispy CDN at runtime.
 
     Args:
-        package: Package name as on PyPI, optionally with version spec
-                 e.g. "requests" or "requests==2.31.0" or "requests>=2.28"
+        package: Package name as on PyPI, e.g. "requests" or "numpy"
         module:  Import name if different from package name.
                  e.g. remote("beautifulsoup4", module="bs4")
-        version: Explicit version string, overrides any spec in package name.
+        version: Version string, e.g. "2.31.0" or "1.26.4"
         deps:    Fetch dependencies too. Overrides global configure() setting.
         host:    CDN host override for this call only.
 
@@ -99,8 +98,8 @@ def remote(
         requests = remote("requests")
         print(requests.get("https://httpbin.org/get").status_code)
     """
-    pkg_name, pkg_version = _parse_package_spec(package)
-    resolved_version = version or pkg_version
+    pkg_name = _parse_package_spec(package)
+    resolved_version = version
     resolved_module = module or pkg_name
     resolved_host = (host or _config["host"]).rstrip("/")
     resolved_deps = _config["deps"] if deps is None else deps
@@ -255,19 +254,16 @@ def _find_and_import_module(module_name: str, search_dir: str, verbose: bool = F
     return None
 
 
-def _parse_package_spec(spec: str) -> tuple[str, Optional[str]]:
+def _parse_package_spec(spec: str) -> str:
     """
-    Parse "requests==2.31.0" → ("requests", "2.31.0")
-    Parse "requests>=2.28"   → ("requests", None)   (range specs unsupported client-side)
-    Parse "requests"         → ("requests", None)
+    Extract package name from spec.
+    Input: "requests" or "numpy"
+    Returns: "requests" or "numpy"
     """
-    m = re.match(r'^([A-Za-z0-9_.\-]+)==([A-Za-z0-9._]+)$', spec.strip())
+    m = re.match(r'^([A-Za-z0-9_.\-]+)$', spec.strip())
     if m:
-        return m.group(1), m.group(2)
-    m = re.match(r'^([A-Za-z0-9_.\-]+)', spec.strip())
-    if m:
-        return m.group(1), None
-    raise WhispyError(f"Cannot parse package spec: '{spec}'")
+        return m.group(1)
+    raise WhispyError(f"Invalid package name: '{spec}'. Use the version parameter instead of inline version specs.")
 
 
 def _fetch_bytes(url: str, verbose: bool = False) -> bytes:
