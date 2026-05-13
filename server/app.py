@@ -115,7 +115,6 @@ def tags_compatible(wheel_tags: set[str], client_tags: list[str]) -> bool:
                 client_parts = client_tag.split("-")
                 if len(client_parts) == 3:
                     client_interp = client_parts[0]
-                    client_abi = client_parts[1]
                     client_plat = client_parts[2]
                     
                     # Platform must match
