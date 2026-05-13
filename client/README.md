@@ -6,6 +6,7 @@
 > Keep your scripts clean, your environments disposable, and your setup friction low.
 
 <p>
+	<a href="https://pypi.org/project/whispy-client/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/whispy-client?style=for-the-badge&logo=pypi&logoColor=white" /></a>
 	<img alt="stdlib only" src="https://img.shields.io/badge/Runtime-stdlib%20only-22c55e?style=for-the-badge" />
 	<img alt="Whispy repo" src="https://img.shields.io/badge/Repo-GitHub-0ea5e9?style=for-the-badge&logo=github&logoColor=white" />
 	<img alt="MIT" src="https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge" />
@@ -67,6 +68,8 @@ cv2 = remote("opencv-python", module="cv2", deps=True)
 ```bash
 pip install whispy-client
 ```
+
+[whispy-client on PyPI](https://pypi.org/project/whispy-client/)
 
 For local development from this repo:
 

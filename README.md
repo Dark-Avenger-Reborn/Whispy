@@ -6,6 +6,7 @@
 > The pythonic way to treat packages like network resources.
 
 <p>
+	<a href="https://pypi.org/project/whispy-client/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/whispy-client?style=for-the-badge&logo=pypi&logoColor=white" /></a>
 	<img alt="PyPI CDN" src="https://img.shields.io/badge/PyPI-CDN-0ea5e9?style=for-the-badge&logo=pypi&logoColor=white" />
 	<img alt="Zero runtime deps" src="https://img.shields.io/badge/Zero%20runtime%20deps-stdlib%20only-22c55e?style=for-the-badge" />
 	<img alt="MIT License" src="https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge" />
@@ -39,6 +40,8 @@ Browse the source on [GitHub](https://github.com/Dark-Avenger-Reborn/Whispy) if 
 ```bash
 pip install whispy-client
 ```
+
+[whispy-client on PyPI](https://pypi.org/project/whispy-client/)
 
 ### Or install from source (development)
 
