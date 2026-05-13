@@ -846,7 +846,7 @@ requests = remote(<span style="color:var(--accent3)">"requests"</span>, deps=<sp
               <tr>
                 <td>package<span class="badge-required">required</span></td>
                 <td>str</td>
-                <td>PyPI distribution name. Accepts bare name <code>"requests"</code> or pinned spec <code>"requests==2.31.0"</code>.</td>
+                <td>PyPI distribution name. <code>"requests"</code>.</td>
               </tr>
               <tr>
                 <td>module<span class="badge-optional">optional</span></td>
@@ -985,7 +985,7 @@ matplotlib = remote(<span style="color:var(--accent3)">"matplotlib"</span>, deps
         <p>Hydrate dependencies at cold-start instead of bundling them into your deployment package. Smaller deploys, faster CI.</p>
         <pre><code><span style="color:var(--text-dimmer)"># In your Lambda handler</span>
 configure(host=<span style="color:var(--accent3)">"https://cdn.whispy.dev"</span>)
-httpx = remote(<span style="color:var(--accent3)">"httpx==0.27.0"</span>, deps=<span style="color:var(--accent2)">True</span>)</code></pre>
+httpx = remote(<span style="color:var(--accent3)">"httpx"</span>, deps=<span style="color:var(--accent2)">True</span>)</code></pre>
       </div>
       <div class="case-card">
         <h3>🔌 Plugin systems</h3>

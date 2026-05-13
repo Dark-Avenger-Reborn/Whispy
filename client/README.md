@@ -79,15 +79,15 @@ pip install -e .
 
 ### `remote(package, *, module=None, version=None, deps=False, host=None)`
 
-`package` can be a bare PyPI distribution name or an exact pin such as `requests==2.31.0`. If the import name differs from the distribution name, pass `module=...`.
+`package` is a PyPI distribution name. Specify versions using the `version` parameter (for example: `remote("requests", version="2.31.0")`). If the import name differs from the distribution name, pass `module=...`.
 
 `deps=True` asks the server to include install-time dependencies as well. That behavior is best-effort and does not perform full dependency conflict resolution.
 
 | Param | Description |
 |-------|-------------|
-| `package` | PyPI distribution name, optionally with `==version` |
+| `package` | PyPI distribution name |
 | `module` | Import name if different from the package name |
-| `version` | Explicit version override, if you do not want to embed it in `package` |
+| `version` | Explicit version override. Specify versions here instead of embedding them in `package` |
 | `deps` | Fetch install-time dependencies as well |
 | `host` | Per-call Whispy server override |
 
