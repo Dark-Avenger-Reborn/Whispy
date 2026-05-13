@@ -707,7 +707,7 @@
           <br />
           <span class="t-comment"># Fetch requests + all its deps at runtime</span><br />
           requests = remote(<span class="t-string">"requests"</span>, deps=<span class="t-import">True</span>)<br />
-          numpy    = remote(<span class="t-string">"numpy==1.26.4"</span>)<br />
+          numpy    = remote(<span class="t-string">"numpy"</span>, version=<span class="t-string">"1.26.4"</span>)<br />
           bs4      = remote(<span class="t-string">"beautifulsoup4"</span>, module=<span class="t-string">"bs4"</span>)<br />
           <br />
           r = requests.get(<span class="t-string">"https://httpbin.org/get"</span>)<br />
@@ -791,7 +791,7 @@ pip install whispy-client
 <span style="color:var(--accent2)">from</span> whispy_client <span style="color:var(--accent2)">import</span> remote
 
 requests = remote(<span style="color:var(--accent3)">"requests"</span>)
-numpy    = remote(<span style="color:var(--accent3)">"numpy==1.26.4"</span>)
+numpy    = remote(<span style="color:var(--accent3)">"numpy"</span>, version=<span style="color:var(--accent3)">"1.26.4"</span>)
 
 <span style="color:var(--text-dimmer)"># Version-pinned, SHA-256 verified,
 # edge-cached, zero install on the system.</span>

@@ -5,7 +5,7 @@ Usage:
     from whispy_client import remote
 
     requests = remote("requests")
-    numpy = remote("numpy==1.26.4")
+    numpy = remote("numpy", version="1.26.4")
     bs4 = remote("beautifulsoup4", module="bs4", deps=True)
 """
 
@@ -111,7 +111,12 @@ def remote(
         return sys.modules[resolved_module]
 
     if verbose:
-        print(f"🌀 Whispy: fetching {pkg_name}" + (f"=={resolved_version}" if resolved_version else ""))
+        version_label = f"=={resolved_version}" if resolved_version else ""
+        dep_label = "on" if resolved_deps else "off"
+        print(
+            f"🌀 Whispy: fetching {pkg_name}{version_label} "
+            f"(module={resolved_module}, deps={dep_label})"
+        )
 
     tags = _compute_tags()
     params = {
@@ -174,9 +179,39 @@ def remote(
         if len(extracted_items) > 20:
             extracted_str += f"\n  ... and {len(extracted_items) - 20} more items"
         
+        missing_name = getattr(e, "name", None)
+        missing_is_dependency = bool(missing_name and missing_name != resolved_module)
+
+        guidance: list[str] = []
+        if missing_is_dependency and missing_name:
+            if resolved_deps:
+                guidance.append(
+                    f"Dependency '{missing_name}' is missing even though deps=True was requested."
+                )
+                guidance.append(
+                    "The server bundle may be incomplete for this platform/version combination."
+                )
+            else:
+                guidance.append(
+                    f"Missing dependency '{missing_name}' detected. Retry with deps=True "
+                    f"or call configure(deps=True) first."
+                )
+        else:
+            guidance.append(
+                f"Module '{resolved_module}' was not importable from the downloaded package."
+            )
+            guidance.append(
+                "If the import name differs from the package name, pass module='...'."
+            )
+
+        guidance_text = "\n".join(guidance)
+        dep_label = "on" if resolved_deps else "off"
+
         raise WhispyError(
-            f"Package '{pkg_name}' was downloaded but module '{resolved_module}' could not be imported.\n"
-            f"Try setting module= explicitly. Original error: {e}\n"
+            f"Package '{pkg_name}' was downloaded but import failed for module '{resolved_module}'.\n"
+            f"Reason: {e}\n"
+            f"Settings: deps={dep_label}, host={resolved_host}\n"
+            f"{guidance_text}\n"
             f"Extracted contents:\n{extracted_str}"
         ) from e
 

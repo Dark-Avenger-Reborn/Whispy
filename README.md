@@ -55,7 +55,7 @@ from whispy_client import remote, configure
 configure(verbose=True)
 
 requests = remote("requests")
-numpy = remote("numpy==1.26.4")
+numpy = remote("numpy", version="1.26.4")
 bs4 = remote("beautifulsoup4", module="bs4", deps=True)
 
 print(requests.get("https://httpbin.org/get").status_code)
@@ -72,14 +72,19 @@ Common examples:
 requests = remote("requests")
 
 # Pin an exact version
-numpy = remote("numpy==1.26.4")
+numpy = remote("numpy", version="1.26.4")
 
 # Map a distribution name to a different import name
 bs4 = remote("beautifulsoup4", module="bs4")
 
 # Pull dependencies too when you need a fuller runtime bundle
 pandas = remote("pandas", deps=True)
+
+# opencv-python imports as cv2 and often needs dependency bundling
+cv2 = remote("opencv-python", module="cv2", deps=True)
 ```
+
+If import fails with a message like `No module named 'numpy'`, the package itself was fetched but a dependency is missing at import time. In that case, retry with `deps=True` or set `configure(deps=True)` globally.
 
 ### Run the server locally
 

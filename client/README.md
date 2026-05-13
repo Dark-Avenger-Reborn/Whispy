@@ -30,7 +30,7 @@ from whispy_client import remote, configure
 configure(verbose=True)
 
 requests = remote("requests")
-numpy = remote("numpy==1.26.4")
+numpy = remote("numpy", version="1.26.4")
 bs4 = remote("beautifulsoup4", module="bs4", deps=True)
 ```
 
@@ -40,7 +40,22 @@ bs4 = remote("beautifulsoup4", module="bs4")
 PIL = remote("pillow", module="PIL")
 yaml = remote("pyyaml", module="yaml")
 dateutil = remote("python-dateutil", module="dateutil")
-cv2 = remote("opencv-python", module="cv2")
+cv2 = remote("opencv-python", module="cv2", deps=True)
+```
+
+## Import Failure Tips
+
+If a package downloads but import fails with an error like `No module named 'numpy'`, that usually means a dependency is missing from the runtime bundle.
+
+- Retry with `deps=True` for that call.
+- Or set `configure(deps=True)` once for process-wide behavior.
+- Keep `module="..."` when the import name differs from the distribution name.
+
+Example:
+
+```python
+# opencv-python imports as cv2 and needs runtime dependencies
+cv2 = remote("opencv-python", module="cv2", deps=True)
 ```
 
 ## Install
