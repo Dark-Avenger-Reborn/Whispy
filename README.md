@@ -64,7 +64,7 @@ bs4 = remote("beautifulsoup4", module="bs4", deps=True)
 print(requests.get("https://httpbin.org/get").status_code)
 ```
 
-Default host: `https://cdn.whispycdn.dev`. Override it per call with `host=...`, or globally with `configure(host=...)` or `WHISPY_HOST`.
+Default host: `https://whispycdn.dev`. Override it per call with `host=...`, or globally with `configure(host=...)` or `WHISPY_HOST`.
 
 If you want the exact implementation, start with the [client package in the repo](https://github.com/Dark-Avenger-Reborn/Whispy/tree/main/client) and the [server entrypoint](https://github.com/Dark-Avenger-Reborn/Whispy/blob/main/server/app.py).
 
@@ -140,7 +140,7 @@ Sets process-wide defaults for the client.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WHISPY_HOST` | `https://cdn.whispycdn.dev` | Default client host |
+| `WHISPY_HOST` | `https://whispycdn.dev` | Default client host |
 | `WHISPY_CACHE_DIR` | `./cache` | Server cache directory |
 | `WHISPY_MAX_CACHE_MB` | `2048` | Maximum cache size in MB |
 | `REDIS_URL` | `memory://` | Optional limiter storage backend |

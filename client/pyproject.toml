@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "whispy-client"
-version = "1.1.6"
+version = "1.1.7"
 description = "Stream Python packages at runtime — the PyPI CDN client"
 readme = "README.md"
 license = { text = "MIT" }
@@ -27,9 +27,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://whispy.dev"
+Homepage = "https://whispycdn.dev"
 Repository = "https://github.com/Dark-Avenger-Reborn/Whispy"
-Documentation = "https://whispy.dev/docs"
+Documentation = "https://whispycdn.dev/docs"
 "Bug Tracker" = "https://github.com/Dark-Avenger-Reborn/Whispy/issues"
 
 [tool.hatch.build.targets.wheel]

@@ -30,7 +30,7 @@ __all__ = ["remote", "configure", "WhispyError"]
 # Default CDN host — users can override via configure() or WHISPY_HOST env var
 # ---------------------------------------------------------------------------
 import os as _os
-_DEFAULT_HOST = _os.environ.get("WHISPY_HOST", "https://cdn.whispycdn.dev")
+_DEFAULT_HOST = _os.environ.get("WHISPY_HOST", "https://whispycdn.dev")
 
 _config = {
     "host": _DEFAULT_HOST,

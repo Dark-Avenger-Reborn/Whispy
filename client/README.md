@@ -96,7 +96,7 @@ pip install -e .
 
 ### `configure(*, host=None, deps=None, verbose=None)`
 
-Sets process-wide defaults. The default host comes from `WHISPY_HOST`, falling back to `https://cdn.whispycdn.dev`.
+Sets process-wide defaults. The default host comes from `WHISPY_HOST`, falling back to `https://whispycdn.dev`.
 
 | Param | Description |
 |-------|-------------|
