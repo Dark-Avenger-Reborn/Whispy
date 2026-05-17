@@ -3,6 +3,12 @@ Whispy CDN Server — Production-ready PyPI package streaming server.
 The Python equivalent of unpkg.com / jsDelivr.
 """
 
+# ALPHA KNOWN LIMITATIONS:
+# - No sandboxing or namespace isolation for downloaded code.
+# - No auth or multi-tenant access control beyond the optional shared secret.
+# - No dependency conflict resolution or lockfile-style reproducibility.
+# - No end-to-end package signature verification beyond PyPI SHA256 digests.
+
 import hashlib
 import json
 import logging
@@ -14,6 +20,7 @@ import time
 import urllib.parse
 import urllib.request
 import zipfile
+import threading
 from io import BytesIO
 from pathlib import Path
 from typing import Optional
@@ -47,6 +54,14 @@ BLOCKLIST: set[str] = {
     "setup-tools", "setuptoolz", "pips", "django-server",
 }
 
+# Conservative safety gates: reject obviously unsafe names/versions before contacting PyPI.
+PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9]+(?:[A-Za-z0-9._-]*[A-Za-z0-9])?$")
+VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._!+:-]*$")
+
+# Coarse per-package locks prevent duplicate concurrent downloads and cache-path races.
+_download_locks: dict[str, threading.Lock] = {}
+_download_locks_guard = threading.Lock()
+
 # ---------------------------------------------------------------------------
 # Flask app + rate limiter
 # ---------------------------------------------------------------------------
@@ -67,6 +82,25 @@ limiter = Limiter(
 def _normalize_name(name: str) -> str:
     """PEP 503 normalization."""
     return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _validate_package_request(package: str, version: Optional[str]) -> None:
+    if not package:
+        raise ValueError("Missing 'name' parameter")
+    if not PACKAGE_NAME_RE.fullmatch(package):
+        raise ValueError("Invalid package name; use only letters, numbers, '.', '_' and '-' characters")
+    if version and not VERSION_RE.fullmatch(version):
+        raise ValueError("Invalid version string; provide a simple PEP 440-style version like '2.31.0'")
+
+
+def _get_package_lock(package: str) -> threading.Lock:
+    key = _normalize_name(package)
+    with _download_locks_guard:
+        lock = _download_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _download_locks[key] = lock
+        return lock
 
 
 def parse_wheel_tags(filename: str) -> set[str]:
@@ -364,6 +398,30 @@ def cache_get(key: str) -> Optional[Path]:
     return zip_path
 
 
+def _load_cached_bundle(key: str) -> Optional[tuple[BytesIO, list[dict]]]:
+    """Load a cached bundle and re-check its SHA256 before serving it."""
+    cached = cache_get(key)
+    if not cached:
+        return None
+
+    meta_path = CACHE_DIR / f"{key}.json"
+    manifest_path = CACHE_DIR / f"{key}.manifest.json"
+    meta = json.loads(meta_path.read_text())
+
+    # Re-hash the cached archive at serve time so a tampered file is caught even after the first download.
+    data = cached.read_bytes()
+    actual = hashlib.sha256(data).hexdigest()
+    if actual != meta["sha256"]:
+        log.warning("Cache integrity fail for %s on serve — evicting", key)
+        meta_path.unlink(missing_ok=True)
+        cached.unlink(missing_ok=True)
+        manifest_path.unlink(missing_ok=True)
+        return None
+
+    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else []
+    return BytesIO(data), manifest
+
+
 def cache_put(key: str, zip_path: Path) -> Path:
     dest = CACHE_DIR / f"{key}.zip"
     shutil.copy2(zip_path, dest)
@@ -404,96 +462,97 @@ def fetch_package_zip(
     if _normalize_name(package) in BLOCKLIST:
         raise ValueError(f"Package '{package}' is blocklisted")
 
-    # Resolve top-level metadata
-    meta = fetch_pypi_metadata(package, version)
-    resolved_version = meta["info"]["version"]
-    tags_str = ",".join(client_tags)
-    key = _cache_key(package, resolved_version, tags_str, with_deps)
+    package_lock = _get_package_lock(package)
+    with package_lock:
+        # Resolve metadata inside the lock so only one request for the same package can build the same cache entry.
+        meta = fetch_pypi_metadata(package, version)
+        resolved_version = meta["info"]["version"]
+        tags_str = ",".join(client_tags)
+        key = _cache_key(package, resolved_version, tags_str, with_deps)
 
-    cached = cache_get(key)
-    if cached:
-        log.info("Cache hit: %s", key)
-        buf = BytesIO(cached.read_bytes())
-        manifest_path = CACHE_DIR / f"{key}.manifest.json"
-        manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else []
-        return buf, resolved_version, manifest
+        cached_bundle = _load_cached_bundle(key)
+        if cached_bundle:
+            log.info("Cache hit: %s", key)
+            return cached_bundle[0], resolved_version, cached_bundle[1]
 
-    # Build package set
-    if with_deps:
-        pkg_list = resolve_dependencies(package, resolved_version)
-    else:
-        pkg_list = [{
-            "name": _normalize_name(package),
-            "version": resolved_version,
-            "files": meta.get("releases", {}).get(resolved_version, []) or meta.get("urls", []),
-        }]
+        # Build package set
+        if with_deps:
+            pkg_list = resolve_dependencies(package, resolved_version)
+        else:
+            pkg_list = [{
+                "name": _normalize_name(package),
+                "version": resolved_version,
+                "files": meta.get("releases", {}).get(resolved_version, []) or meta.get("urls", []),
+            }]
 
-    manifest = []
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
+        manifest = []
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
 
-        for pkg in pkg_list:
-            pkg_dir = tmp / pkg["name"]
-            pkg_dir.mkdir()
-            try:
-                chosen_filename = download_package_to_dir(pkg["files"], client_tags, pkg_dir)
-                sha = None
-                for f in pkg["files"]:
-                    if f["filename"] == chosen_filename:
-                        sha = f.get("digests", {}).get("sha256")
-                        break
-                
-                # Validate that files were actually extracted
-                extracted_items = list(pkg_dir.rglob("*"))
-                files_count = len([f for f in extracted_items if f.is_file()])
-                if files_count == 0:
-                    raise RuntimeError(f"No files extracted from {chosen_filename} (extracted {len(extracted_items)} total items)")
-                
-                manifest.append({
-                    "name": pkg["name"],
-                    "version": pkg["version"],
-                    "filename": chosen_filename,
-                    "sha256": sha,
-                    "items_extracted": files_count,
-                })
-                log.info("Successfully extracted %d files from %s for %s", files_count, chosen_filename, pkg["name"])
-            except Exception as e:
-                log.error("Could not fetch %s: %s", pkg["name"], e, exc_info=True)
-
-        # Check if any packages were successfully extracted
-        if not manifest:
-            raise RuntimeError(f"No packages were successfully downloaded for {package}. Check server logs for details.")
-
-        # Zip everything up
-        zip_tmp = tmp / "bundle.zip"
-        with zipfile.ZipFile(zip_tmp, "w", zipfile.ZIP_DEFLATED) as zf:
-            file_count = 0
-            for item in tmp.rglob("*"):
-                if item == zip_tmp or not item.is_file():
-                    continue
-                # Strip the per-package subdir so all modules land at root
+            for pkg in pkg_list:
+                pkg_dir = tmp / pkg["name"]
+                pkg_dir.mkdir()
                 try:
-                    pkg_name = item.relative_to(tmp).parts[0]
-                    arcname = item.relative_to(tmp / pkg_name)
-                    zf.write(item, arcname)
-                    file_count += 1
+                    chosen_filename = download_package_to_dir(pkg["files"], client_tags, pkg_dir)
+                    sha = None
+                    for f in pkg["files"]:
+                        if f["filename"] == chosen_filename:
+                            sha = f.get("digests", {}).get("sha256")
+                            break
+
+                    # Validate that files were actually extracted.
+                    extracted_items = list(pkg_dir.rglob("*"))
+                    files_count = len([f for f in extracted_items if f.is_file()])
+                    if files_count == 0:
+                        raise RuntimeError(f"No files extracted from {chosen_filename} (extracted {len(extracted_items)} total items)")
+
+                    manifest.append({
+                        "name": pkg["name"],
+                        "version": pkg["version"],
+                        "filename": chosen_filename,
+                        "sha256": sha,
+                        "items_extracted": files_count,
+                    })
+                    log.info("Successfully extracted %d files from %s for %s", files_count, chosen_filename, pkg["name"])
                 except Exception as e:
-                    log.warning("Failed to add file %s to zip: %s", item, e)
-                    continue
-        
-        log.info("Zipped %d files for package %s v%s", file_count, package, resolved_version)
-        
-        if file_count == 0:
-            raise RuntimeError(f"No files were added to the package bundle for {package}. Extracted {sum(m['items_extracted'] for m in manifest)} files but zip is empty.")
+                    log.error("Could not fetch %s: %s", pkg["name"], e, exc_info=True)
 
-        cached_path = cache_put(key, zip_tmp)
+            # Check if any packages were successfully extracted.
+            if not manifest:
+                raise RuntimeError(f"No packages were successfully downloaded for {package}. Check server logs for details.")
 
-        # Save manifest
-        manifest_path = CACHE_DIR / f"{key}.manifest.json"
-        manifest_path.write_text(json.dumps(manifest))
+            # Zip everything up.
+            zip_tmp = tmp / "bundle.zip"
+            with zipfile.ZipFile(zip_tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+                file_count = 0
+                for item in tmp.rglob("*"):
+                    if item == zip_tmp or not item.is_file():
+                        continue
+                    # Strip the per-package subdir so all modules land at root.
+                    try:
+                        pkg_name = item.relative_to(tmp).parts[0]
+                        arcname = item.relative_to(tmp / pkg_name)
+                        zf.write(item, arcname)
+                        file_count += 1
+                    except Exception as e:
+                        log.warning("Failed to add file %s to zip: %s", item, e)
+                        continue
 
-    buf = BytesIO(cached_path.read_bytes())
-    return buf, resolved_version, manifest
+            log.info("Zipped %d files for package %s v%s", file_count, package, resolved_version)
+
+            if file_count == 0:
+                raise RuntimeError(f"No files were added to the package bundle for {package}. Extracted {sum(m['items_extracted'] for m in manifest)} files but zip is empty.")
+
+            cache_put(key, zip_tmp)
+
+            # Save manifest alongside the cached archive so later requests can serve it without re-fetching.
+            manifest_path = CACHE_DIR / f"{key}.manifest.json"
+            manifest_path.write_text(json.dumps(manifest))
+
+        cached_bundle = _load_cached_bundle(key)
+        if not cached_bundle:
+            raise RuntimeError(f"Cache verification failed immediately after writing {key}")
+        return cached_bundle[0], resolved_version, cached_bundle[1]
 
 
 # ---------------------------------------------------------------------------
@@ -545,19 +604,24 @@ def get_package():
     tags_raw = request.args.get("tags", "").strip()
     with_deps = request.args.get("deps", "0") in ("1", "true", "yes")
 
-    if not package:
-        return jsonify({"error": "Missing 'name' parameter"}), 400
     if not tags_raw:
         return jsonify({"error": "Missing 'tags' parameter"}), 400
-    if not re.match(r'^[A-Za-z0-9_.\-]+$', package):
-        return jsonify({"error": "Invalid package name"}), 400
+    try:
+        _validate_package_request(package, version)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
     client_tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
 
     try:
         buf, resolved_version, manifest = fetch_package_zip(package, version, client_tags, with_deps)
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404
+        message = str(e)
+        if "not found on PyPI" in message:
+            return jsonify({"error": message}), 404
+        if "blocklisted" in message:
+            return jsonify({"error": message}), 400
+        return jsonify({"error": message}), 500
     except Exception as e:
         log.exception("Error fetching %s", package)
         return jsonify({"error": str(e)}), 500
@@ -579,9 +643,12 @@ def get_package():
 @limiter.limit("120 per minute")
 def metadata(package: str):
     """GET /metadata/requests — returns PyPI metadata JSON for a package."""
-    if not re.match(r'^[A-Za-z0-9_.\-]+$', package):
-        return jsonify({"error": "Invalid package name"}), 400
     version = request.args.get("version") or None
+    try:
+        _validate_package_request(package, version)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
     try:
         meta = fetch_pypi_metadata(package, version)
         info = meta["info"]

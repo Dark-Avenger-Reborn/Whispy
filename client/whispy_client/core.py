@@ -9,22 +9,31 @@ Usage:
     bs4 = remote("beautifulsoup4", module="bs4", deps=True)
 """
 
+# ALPHA KNOWN LIMITATIONS:
+# - No sandboxing or namespace isolation; imported code runs with full process privileges.
+# - No dependency conflict resolution; imports follow normal Python semantics.
+# - No auth or multi-tenant access control; trust the configured server.
+# - No signed package verification beyond the server-provided archive.
+
 from __future__ import annotations
 
+import atexit
 import importlib
 import io
 import json
 import platform
 import re
+import socket
 import sys
 import tempfile
 import urllib.error
 import urllib.request
 import zipfile
+import warnings
 from typing import Optional
 
 __version__ = "1.1.0"
-__all__ = ["remote", "configure", "WhispyError"]
+__all__ = ["remote", "configure", "whispy_cleanup", "WhispyError"]
 
 # ---------------------------------------------------------------------------
 # Default CDN host — users can override via configure() or WHISPY_HOST env var
@@ -38,12 +47,23 @@ _config = {
     "verbose": False,
 }
 
-# Tracks live TemporaryDirectory objects so they stay alive for the process
+# Tracks live TemporaryDirectory objects so they stay alive until explicit cleanup.
 _live_tmpdirs: list[tempfile.TemporaryDirectory] = []
 
 
 class WhispyError(RuntimeError):
     pass
+
+
+def whispy_cleanup() -> None:
+    """Explicitly clean up all Whispy temporary directories."""
+    while _live_tmpdirs:
+        tmpdir = _live_tmpdirs.pop()
+        _remove_sys_path_entries_under(tmpdir.name)
+        tmpdir.cleanup()
+
+
+atexit.register(whispy_cleanup)
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +125,15 @@ def remote(
     resolved_deps = _config["deps"] if deps is None else deps
     verbose = _config["verbose"]
 
+    if resolved_version is None:
+        # Alpha reminder: unpinned imports are convenient, but they are not reproducible.
+        warnings.warn(
+            f"Whispy is fetching the latest available version of '{pkg_name}'. "
+            "Pin version='...' for reproducible imports.",
+            UserWarning,
+            stacklevel=2,
+        )
+
     # Return from sys.modules if already loaded
     if resolved_module in sys.modules:
         return sys.modules[resolved_module]
@@ -133,22 +162,55 @@ def remote(
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors="replace")
         try:
-            msg = json.loads(body).get("error", body)
+            payload = json.loads(body)
+            msg = payload.get("error") or payload.get("message") or body
         except Exception:
-            msg = body
-        raise WhispyError(f"Whispy CDN error for '{pkg_name}': {msg}") from e
+            msg = body or e.reason or "unknown server response"
+
+        if e.code == 404:
+            raise WhispyError(
+                f"Package '{pkg_name}' was not found on Whispy server {resolved_host}. {msg}"
+            ) from e
+        if 500 <= e.code < 600:
+            raise WhispyError(
+                f"Whispy server error while fetching '{pkg_name}' from {resolved_host} "
+                f"(HTTP {e.code}): {msg}. Try again later or check server logs."
+            ) from e
+
+        raise WhispyError(
+            f"Whispy request for '{pkg_name}' failed with HTTP {e.code}: {msg}"
+        ) from e
+    except urllib.error.URLError as e:
+        reason = getattr(e, "reason", e)
+        reason_text = str(reason)
+        if isinstance(reason, (socket.timeout, TimeoutError)) or "timed out" in reason_text.lower():
+            raise WhispyError(
+                f"Whispy request to {resolved_host} timed out while fetching '{pkg_name}'. "
+                "Check network connectivity or increase the server timeout."
+            ) from e
+        raise WhispyError(
+            f"Could not connect to Whispy server at {resolved_host} for '{pkg_name}': {reason_text}"
+        ) from e
     except Exception as e:
-        raise WhispyError(f"Could not reach Whispy CDN at {resolved_host}: {e}") from e
+        raise WhispyError(
+            f"Unexpected Whispy client failure while fetching '{pkg_name}' from {resolved_host}: {e}"
+        ) from e
 
     # Extract into a TemporaryDirectory that lives for the process lifetime
     tmpdir = tempfile.TemporaryDirectory(prefix="whispy_", ignore_cleanup_errors=True)
     _live_tmpdirs.append(tmpdir)
 
-    with zipfile.ZipFile(io.BytesIO(data)) as zf:
-        zf.extractall(tmpdir.name)
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            zf.extractall(tmpdir.name)
+    except zipfile.BadZipFile as e:
+        _cleanup_tmpdir(tmpdir)
+        raise WhispyError(
+            f"Whispy server returned a malformed archive for '{pkg_name}' from {resolved_host}."
+        ) from e
 
     if tmpdir.name not in sys.path:
-        sys.path.insert(0, tmpdir.name)
+        _insert_sys_path_safely(tmpdir.name)
 
     if verbose:
         print(f"✅ Whispy: imported {resolved_module} from {tmpdir.name}")
@@ -206,6 +268,9 @@ def remote(
         guidance_text = "\n".join(guidance)
         dep_label = "on" if resolved_deps else "off"
 
+        # If the import failed, release just this tempdir so a broken extract does not linger.
+        _cleanup_tmpdir(tmpdir)
+
         raise WhispyError(
             f"Package '{pkg_name}' was downloaded but import failed for module '{resolved_module}'.\n"
             f"Reason: {e}\n"
@@ -231,12 +296,12 @@ def _find_and_import_module(module_name: str, search_dir: str, verbose: bool = F
     try:
         for item in os.listdir(search_dir):
             item_path = os.path.join(search_dir, item)
-            if os.path.isdir(item_path) and item not in sys.path:
+            if os.path.isdir(item_path) and item_path not in sys.path:
                 # Skip .dist-info directories
                 if item.endswith('.dist-info') or item.endswith('.data'):
                     continue
-                # Try adding this directory to sys.path
-                sys.path.insert(0, item_path)
+                # Insert after stdlib entries, not at position 0, so we do not shadow stdlib modules.
+                _insert_sys_path_safely(item_path)
                 try:
                     if verbose:
                         print(f"🌀 Whispy: trying to import {module_name} from {item_path}")
@@ -245,8 +310,8 @@ def _find_and_import_module(module_name: str, search_dir: str, verbose: bool = F
                         print(f"✅ Whispy: successfully imported {module_name} from {item_path}")
                     return result
                 except ModuleNotFoundError:
-                    # Remove this path since it didn't work
-                    sys.path.pop(0)
+                    # Remove only the path we added so failed probes do not accumulate in sys.path.
+                    _remove_sys_path_entry(item_path)
                     continue
     except Exception:
         pass
@@ -264,6 +329,49 @@ def _parse_package_spec(spec: str) -> str:
     if m:
         return m.group(1)
     raise WhispyError(f"Invalid package name: '{spec}'. Use the version parameter instead of inline version specs.")
+
+
+def _cleanup_tmpdir(tmpdir: tempfile.TemporaryDirectory) -> None:
+    """Remove a single tempdir from sys.path and clean it up immediately."""
+    _remove_sys_path_entries_under(tmpdir.name)
+    if tmpdir in _live_tmpdirs:
+        _live_tmpdirs.remove(tmpdir)
+    tmpdir.cleanup()
+
+
+def _remove_sys_path_entry(path: str) -> None:
+    while path in sys.path:
+        sys.path.remove(path)
+
+
+def _remove_sys_path_entries_under(root: str) -> None:
+    root_abs = _os.path.abspath(root)
+    sys.path[:] = [entry for entry in sys.path if not _path_is_under(entry, root_abs)]
+
+
+def _path_is_under(candidate: str, root: str) -> bool:
+    try:
+        candidate_abs = _os.path.abspath(candidate)
+        return _os.path.commonpath([candidate_abs, root]) == root
+    except Exception:
+        return False
+
+
+def _insert_sys_path_safely(path: str) -> None:
+    """
+    Add Whispy temp paths after stdlib entries so we avoid shadowing the standard library.
+    If no site-packages boundary is found, we append as the safest fallback.
+    """
+    if path in sys.path:
+        return
+
+    site_prefixes = ("site-packages", "dist-packages")
+    insert_at = len(sys.path)
+    for index, entry in enumerate(sys.path):
+        if any(prefix in entry for prefix in site_prefixes):
+            insert_at = index
+            break
+    sys.path.insert(insert_at, path)
 
 
 def _fetch_bytes(url: str, verbose: bool = False) -> bytes:
