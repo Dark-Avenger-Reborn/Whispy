@@ -15,9 +15,9 @@
 
 </div>
 
-Whispy streams Python packages at runtime. The client downloads a package bundle from a Whispy server, extracts it to a temporary directory, adds that directory to `sys.path`, and imports the requested module on demand. Nothing is permanently installed.
+Whispy streams Python packages into your process at runtime—no `pip install`, no virtualenv, and no permanent system changes. The client downloads a verified bundle from a Whispy server, extracts it into a temporary directory, inserts that directory on `sys.path`, and imports the requested module on demand.
 
-Browse the source on [GitHub](https://github.com/Dark-Avenger-Reborn/Whispy) if you want to follow the client, the server, or the release workflow in the repo.
+See the implementation and release workflow on [GitHub](https://github.com/Dark-Avenger-Reborn/Whispy).
 
 ## Why Whispy
 
