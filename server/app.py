@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import shutil
+import stat
 import tempfile
 import time
 import urllib.parse
@@ -299,6 +300,64 @@ def _download(url: str, dest: Path) -> None:
         shutil.copyfileobj(resp, out)
 
 
+def _safe_target(base_dir: Path, target: Path) -> Path:
+    base = base_dir.resolve()
+    resolved = (base / target).resolve()
+    if resolved == base or base in resolved.parents:
+        return resolved
+    raise ValueError(f"Archive member escapes extraction directory: {target}")
+
+
+def _is_zip_symlink(info: zipfile.ZipInfo) -> bool:
+    return stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK
+
+
+def _safe_extract_zip(archive: zipfile.ZipFile, dest_dir: Path) -> int:
+    extracted = 0
+    for info in archive.infolist():
+        name = info.filename
+        if not name or name.endswith("/"):
+            continue
+
+        member_path = Path(name)
+        if member_path.is_absolute() or ".." in member_path.parts:
+            raise ValueError(f"Unsafe zip member path: {name}")
+        if _is_zip_symlink(info):
+            raise ValueError(f"Refusing to extract symlink entry: {name}")
+
+        target = _safe_target(dest_dir, member_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.open(info, "r") as src, open(target, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+        extracted += 1
+
+    return extracted
+
+
+def _safe_extract_tar(archive, dest_dir: Path) -> int:
+    extracted = 0
+    for member in archive.getmembers():
+        if member.isdir():
+            continue
+        if member.islnk() or member.issym() or member.isdev():
+            raise ValueError(f"Refusing to extract unsafe tar member: {member.name}")
+
+        member_path = Path(member.name)
+        if member_path.is_absolute() or ".." in member_path.parts:
+            raise ValueError(f"Unsafe tar member path: {member.name}")
+
+        target = _safe_target(dest_dir, member_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source = archive.extractfile(member)
+        if source is None:
+            continue
+        with source, open(target, "wb") as dst:
+            shutil.copyfileobj(source, dst)
+        extracted += 1
+
+    return extracted
+
+
 def _best_wheel(files: list[dict], client_tags: list[str]) -> Optional[dict]:
     wheels = [f for f in files if f["filename"].endswith(".whl")]
     compatible = [
@@ -360,15 +419,13 @@ def download_package_to_dir(pkg_files: list[dict], client_tags: list[str], dest_
     # Extract
     if chosen["filename"].endswith(".whl") or chosen["filename"].endswith(".zip"):
         with zipfile.ZipFile(tmp, "r") as z:
-            z.extractall(dest_dir)
-            # Log extraction for debugging
-            extracted_files = z.namelist()
-            log.debug("Extracted %d files from %s", len(extracted_files), chosen["filename"])
+            extracted_files = _safe_extract_zip(z, dest_dir)
+            log.debug("Extracted %d files from %s", extracted_files, chosen["filename"])
     else:
         import tarfile
         with tarfile.open(tmp, "r:gz") as t:
-            t.extractall(dest_dir)
-            log.debug("Extracted tarfile %s", chosen["filename"])
+            extracted_files = _safe_extract_tar(t, dest_dir)
+            log.debug("Extracted %d files from tarfile %s", extracted_files, chosen["filename"])
 
     tmp.unlink()
     return chosen["filename"]
